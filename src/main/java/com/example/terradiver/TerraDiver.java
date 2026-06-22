@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 
 import com.example.terradiver.registry.BlockEntityRegistry;
 import com.example.terradiver.registry.BlockRegistry;
+import com.example.terradiver.registry.CreativeTabs;
 import com.example.terradiver.registry.ItemRegistry;
 import com.mojang.logging.LogUtils;
 
@@ -25,6 +26,7 @@ public class TerraDiver {
         BlockRegistry.BLOCKS.register(modEventBus);
         BlockEntityRegistry.BLOCK_ENTITIES.register(modEventBus);
         ItemRegistry.ITEMS.register(modEventBus);
+        CreativeTabs.CREATIVE_TABS.register(modEventBus);
 
         // Register the common setup event
         modEventBus.addListener(this::commonSetup);
