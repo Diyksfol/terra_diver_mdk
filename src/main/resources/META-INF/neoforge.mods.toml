@@ -46,7 +46,8 @@ displayName="${mod_name}" #mandatory
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Example mod description.
+Terra Diver is a mod that brings underwater exploration and pressure dynamics to Minecraft.
+Built with NeoForge 1.21.1 and integrated with Create ecosystem mods.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
@@ -86,6 +87,22 @@ Example mod description.
     # This version range declares a minimum of the current minecraft version up to but not including the next major version
     versionRange="${minecraft_version_range}"
     ordering="NONE"
+    side="BOTH"
+
+# Create mod dependency
+[[dependencies.${mod_id}]]
+    modId="create"
+    type="required"
+    versionRange="[0.5,)"
+    ordering="AFTER"
+    side="BOTH"
+
+# Create: Aeronautics Simulated dependency
+[[dependencies.${mod_id}]]
+    modId="aeronautics"
+    type="required"
+    versionRange="[0.6,)"
+    ordering="AFTER"
     side="BOTH"
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares

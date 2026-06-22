@@ -27,6 +27,12 @@ sourceSets.main.resources {
 
 repositories {
     // Add here additional repositories if required by some of the dependencies below.
+    
+    // Maven repositories for mods
+    maven { url "https://maven.theillusivec4.com/" }
+    maven { url "https://modmaven.k02c.dev/" }
+    maven { url "https://maven.blamej.com/" }
+    maven { url "https://jab125.github.io/maven/" }
 }
 
 base {
@@ -121,6 +127,14 @@ dependencies {
 
     // Example project dependency using a sister or child project:
     // implementation project(":myproject")
+    
+    // Create mod - TODO: verify exact maven coordinates from official repository
+    // modImplementation "com.simibubi.create:create-${minecraft_version}:${create_version}"
+    
+    // Create: Aeronautics Simulated - TODO: verify exact maven coordinates
+    // modImplementation "com.rabbitminers.aeronautics:aeronautics-simulated-${minecraft_version}:${aeronautics_version}"
+    
+    // Sable - bundled with Aeronautics, will add when coordinates verified
 
     // For more info:
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
