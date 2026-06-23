@@ -2,6 +2,7 @@ package com.example.terradiver;
 
 import org.slf4j.Logger;
 
+import com.example.terradiver.config.ModConfig;
 import com.example.terradiver.registry.BlockEntityRegistry;
 import com.example.terradiver.registry.BlockRegistry;
 import com.example.terradiver.registry.CreativeTabs;
@@ -11,6 +12,7 @@ import com.mojang.logging.LogUtils;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -21,7 +23,10 @@ public class TerraDiver {
     public static final String MODID = "terra_diver";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public TerraDiver(IEventBus modEventBus) {
+    public TerraDiver(IEventBus modEventBus, ModContainer modContainer) {
+        // Register config
+        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.COMMON, ModConfig.SPEC, "terra_diver-common.toml");
+
         // Register the deferred registers to the mod event bus
         BlockRegistry.BLOCKS.register(modEventBus);
         BlockEntityRegistry.BLOCK_ENTITIES.register(modEventBus);

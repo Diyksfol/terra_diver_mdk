@@ -73,12 +73,10 @@ public class BlockRegistry {
             BLOCKS.register("crown_bearing_andesite", () -> new Block(Block.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
     public static final DeferredHolder<Block, Block> CROWN_BEARING_STURDY =
             BLOCKS.register("crown_bearing_sturdy", () -> new Block(Block.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
-    public static final DeferredHolder<Block, Block> AUGER_SHAFT =
-            BLOCKS.register("auger_shaft", () -> new Block(Block.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
     public static final DeferredHolder<Block, Block> PRESSURE_GAUGE =
             BLOCKS.register("pressure_gauge", () -> new Block(Block.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
-    public static final DeferredHolder<Block, Block> SEISMIC_PROBE =
-            BLOCKS.register("seismic_probe", () -> new Block(Block.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
+    public static final DeferredHolder<Block, Block> TERRADAR =
+            BLOCKS.register("terradar", () -> new Block(Block.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
     public static final DeferredHolder<Block, Block> CARTOGRAPH_CONSOLE =
             BLOCKS.register("cartograph_console", () -> new Block(Block.Properties.ofFullCopy(Blocks.IRON_BLOCK)));
 }

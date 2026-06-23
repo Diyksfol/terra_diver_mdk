@@ -68,12 +68,10 @@ public class ItemRegistry {
             ITEMS.register("crown_bearing_andesite", () -> new BlockItem(BlockRegistry.CROWN_BEARING_ANDESITE.get(), new Item.Properties()));
     public static final DeferredHolder<Item, Item> CROWN_BEARING_STURDY =
             ITEMS.register("crown_bearing_sturdy", () -> new BlockItem(BlockRegistry.CROWN_BEARING_STURDY.get(), new Item.Properties()));
-    public static final DeferredHolder<Item, Item> AUGER_SHAFT =
-            ITEMS.register("auger_shaft", () -> new BlockItem(BlockRegistry.AUGER_SHAFT.get(), new Item.Properties()));
     public static final DeferredHolder<Item, Item> PRESSURE_GAUGE =
             ITEMS.register("pressure_gauge", () -> new BlockItem(BlockRegistry.PRESSURE_GAUGE.get(), new Item.Properties()));
-    public static final DeferredHolder<Item, Item> SEISMIC_PROBE =
-            ITEMS.register("seismic_probe", () -> new BlockItem(BlockRegistry.SEISMIC_PROBE.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, Item> TERRADAR =
+            ITEMS.register("terradar", () -> new BlockItem(BlockRegistry.TERRADAR.get(), new Item.Properties()));
     public static final DeferredHolder<Item, Item> CARTOGRAPH_CONSOLE =
             ITEMS.register("cartograph_console", () -> new BlockItem(BlockRegistry.CARTOGRAPH_CONSOLE.get(), new Item.Properties()));
 

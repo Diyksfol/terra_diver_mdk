@@ -49,9 +49,8 @@ public class CreativeTabs {
                         // Add other blocks
                         output.accept(BlockRegistry.CROWN_BEARING_ANDESITE.get());
                         output.accept(BlockRegistry.CROWN_BEARING_STURDY.get());
-                        output.accept(BlockRegistry.AUGER_SHAFT.get());
                         output.accept(BlockRegistry.PRESSURE_GAUGE.get());
-                        output.accept(BlockRegistry.SEISMIC_PROBE.get());
+                        output.accept(BlockRegistry.TERRADAR.get());
                         output.accept(BlockRegistry.CARTOGRAPH_CONSOLE.get());
 
                         // Add crafting items
