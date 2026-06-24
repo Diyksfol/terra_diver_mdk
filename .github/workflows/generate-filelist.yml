@@ -37,6 +37,7 @@ jobs:
             echo "# File List — ${REPO}"
             echo "_Обновлён: $(date -u '+%Y-%m-%d %H:%M UTC')_"
             echo "_Ветка: ${BRANCH}_"
+            echo "_Raw: ${BASE}/${OUTPUT}_"
             echo ""
             find src -name "*.java" | sort | while read f; do
               echo "- [${f}](${BASE}/${f})"
