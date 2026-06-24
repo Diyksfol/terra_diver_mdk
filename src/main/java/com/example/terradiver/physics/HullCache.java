@@ -1,8 +1,13 @@
 package com.example.terradiver.pressure;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
 
 /**
@@ -31,42 +36,221 @@ public class HullCache {
     /** Доля внешней поверхности, покрытая балками жёсткости, [0.0, 1.0]. */
     public float         getRibCoverage()      { return ribCoverage; }
 
+    // ── Интерфейс чтения SubLevel ────────────────────────────────────────────────
+
     /**
-     * invalidate_hull_cache() — атомарно пересчитать все три кэша корпуса.
+     * Читает структуру SubLevel в локальных координатах.
+     * Изолирует неподтверждённый API SubLevel — вся неопределённость здесь.
+     * TODO[API-CHECK]: подтвердить точный API для getBounds() и isFullBlock() с реальным SubLevel.
+     */
+    interface ISubLevelReader {
+
+        /**
+         * Bounding box SubLevel в локальных координатах.
+         * null — если SubLevel пуст или тип неизвестен.
+         * TODO[API-CHECK]: подтвердить метод получения bbox у реального SubLevel.
+         */
+        AABB getBounds(Object subLevel);
+
+        /**
+         * Содержит ли {@code localPos} блок с полной коллизией (hull-блок).
+         * false — для воздуха, отсутствующих блоков и неполных коллизий (двери, лестницы).
+         *
+         * <p>Спецификация: {@code block.getCollisionShape() == Shapes.block()} (TD_06, TD_03).
+         * TODO[API-CHECK]: getCollisionShape() требует BlockGetter + BlockPos;
+         * подтвердить безопасный вызов из контекста SubLevel в локальных координатах.
+         */
+        boolean isFullBlock(Object subLevel, BlockPos localPos);
+    }
+
+    /** Production-читалка SubLevel (placeholder до подтверждения API). */
+    private static final ISubLevelReader DEFAULT_SUB_LEVEL_READER = new ISubLevelReader() {
+        @Override
+        public AABB getBounds(Object subLevel) {
+            // TODO[API-CHECK]: вернуть реальный bbox SubLevel в локальных координатах
+            return null; // null → computeExteriorSurface вернёт Set.of() без NPE
+        }
+
+        @Override
+        public boolean isFullBlock(Object subLevel, BlockPos localPos) {
+            // TODO[API-CHECK]: subLevel.getBlockState(localPos).getCollisionShape(...) == Shapes.block()
+            return false; // placeholder — все позиции считаются воздухом
+        }
+    };
+
+    // ── 6 направлений для BFS ────────────────────────────────────────────────────
+
+    private static final int[] DX = {1, -1, 0,  0,  0, 0};
+    private static final int[] DY = {0,  0, 1, -1,  0, 0};
+    private static final int[] DZ = {0,  0, 0,  0,  1, -1};
+
+    // ── compute_exterior_surface ─────────────────────────────────────────────────
+
+    /**
+     * compute_exterior_surface() — production-версия.
      * Спецификация: TD_06 v1.0, TD_03.
+     */
+    static Set<BlockPos> computeExteriorSurface(Object subLevel) {
+        return computeExteriorSurface(subLevel, DEFAULT_SUB_LEVEL_READER);
+    }
+
+    /**
+     * compute_exterior_surface() — overload с явным {@code reader} для тестов.
+     *
+     * <p><b>Алгоритм (два шага):</b>
+     * <ol>
+     *   <li><b>Flood-fill внешней пустоты:</b> BFS стартует со всех клеток внешней оболочки
+     *       расширенного (+1 блок) bounding box, распространяется только через клетки без
+     *       полной коллизии. Результат — множество клеток {@code exteriorVoid}.
+     *   <li><b>Граничные hull-блоки:</b> каждый блок с полной коллизией, у которого
+     *       хотя бы один из 6 соседей входит в {@code exteriorVoid}, — на внешней поверхности.
+     * </ol>
+     *
+     * <p><b>Критично — локальные координаты:</b> flood-fill работает в системе координат
+     * SubLevel, а не мира. Flood-fill в мировых координатах схлопнул бы surface в пустое
+     * множество под землёй (Dive Mode) — ровно когда механика давления и должна работать
+     * (TD_06, граничные случаи). Это критическая ошибка реализации.
+     *
+     * <p><b>Внутренние полости</b> (кабина, отсеки) flood-fill снаружи не достигает:
+     * они отделены hull-блоками. Их стены в {@code exterior_surface} не попадают.
+     *
+     * @param subLevel контекст SubLevel штуковины
+     * @param reader   читалка SubLevel (инъекция для тестов)
+     * @return неизменяемое множество позиций hull-блоков на внешней поверхности
+     */
+    static Set<BlockPos> computeExteriorSurface(Object subLevel, ISubLevelReader reader) {
+        AABB bounds = reader.getBounds(subLevel);
+        if (bounds == null) {
+            return Set.of(); // SubLevel пуст или API не подтверждён — возвращаем пустое
+        }
+
+        // Расширенный bbox: +1 блок во все стороны.
+        // Гарантирует, что BFS-семена окружают всю структуру снаружи,
+        // а не упираются вплотную в её границу.
+        int minX = (int) Math.floor(bounds.minX) - 1;
+        int minY = (int) Math.floor(bounds.minY) - 1;
+        int minZ = (int) Math.floor(bounds.minZ) - 1;
+        int maxX = (int) Math.ceil(bounds.maxX)  + 1;
+        int maxY = (int) Math.ceil(bounds.maxY)  + 1;
+        int maxZ = (int) Math.ceil(bounds.maxZ)  + 1;
+
+        // ── Шаг 1: flood-fill внешней пустоты ────────────────────────────────
+
+        // Семена — все клетки на 6 гранях расширенного bbox.
+        // BFS не выходит за его пределы — ограничение объёма обхода.
+        Set<BlockPos> exteriorVoid = new HashSet<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    if (x == minX || x == maxX ||
+                        y == minY || y == maxY ||
+                        z == minZ || z == maxZ) {
+                        BlockPos seed = new BlockPos(x, y, z);
+                        if (exteriorVoid.add(seed)) {
+                            queue.add(seed);
+                        }
+                    }
+                }
+            }
+        }
+
+        // BFS: распространяемся через пустые клетки (не hull-блоки).
+        // Hull-блоки останавливают flood-fill — их соседи за ними не достигаются
+        // (именно это защищает внутренние полости от попадания в exterior_surface).
+        while (!queue.isEmpty()) {
+            BlockPos curr = queue.poll();
+
+            for (int i = 0; i < 6; i++) {
+                int nx = curr.getX() + DX[i];
+                int ny = curr.getY() + DY[i];
+                int nz = curr.getZ() + DZ[i];
+
+                // Не выходить за расширенный bbox
+                if (nx < minX || nx > maxX ||
+                    ny < minY || ny > maxY ||
+                    nz < minZ || nz > maxZ) {
+                    continue;
+                }
+
+                BlockPos neighbor = new BlockPos(nx, ny, nz);
+                if (exteriorVoid.contains(neighbor)) {
+                    continue; // уже посещена
+                }
+
+                // Hull-блок (полная коллизия) → граница flood-fill; не добавлять.
+                // Неполные блоки (двери, лестницы) → пропускаем, как воздух (TD_06: исключены).
+                if (reader.isFullBlock(subLevel, neighbor)) {
+                    continue;
+                }
+
+                exteriorVoid.add(neighbor);
+                queue.add(neighbor);
+            }
+        }
+
+        // ── Шаг 2: hull-блоки, граничащие с внешней пустотой ─────────────────
+
+        // Перебираем весь расширенный bbox: позиции вне SubLevel вернут isFullBlock=false,
+        // поэтому сразу отфильтруются — отдельный inner-диапазон не нужен.
+        Set<BlockPos> result = new HashSet<>();
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    BlockPos pos = new BlockPos(x, y, z);
+
+                    if (!reader.isFullBlock(subLevel, pos)) {
+                        continue; // не hull-блок — воздух, дверь, лестница и т.д.
+                    }
+
+                    // Хотя бы один сосед в exteriorVoid → блок на внешней поверхности
+                    for (int i = 0; i < 6; i++) {
+                        BlockPos neighbor = new BlockPos(
+                                x + DX[i], y + DY[i], z + DZ[i]);
+                        if (exteriorVoid.contains(neighbor)) {
+                            result.add(pos);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return Collections.unmodifiableSet(result);
+    }
+
+    // ── invalidate_hull_cache ────────────────────────────────────────────────────
+
+    /**
+     * invalidate_hull_cache() — production-версия.
+     * Атомарно пересчитывает все три кэша корпуса. Спецификация: TD_06 v1.0, TD_03.
      *
      * <p><b>Порядок строгий:</b> exterior_surface → girder_lines → rib_coverage.
-     * Каждый следующий шаг читает результат предыдущего — перестановка нарушает
-     * топологический порядок зависимостей и приводит к использованию устаревших данных.
-     *
-     * <p><b>Атомарность:</b> три поля обновляются одновременно в конце метода,
-     * не по одному. Между пересчётом и сохранением читатели видят предыдущее
-     * согласованное состояние, не промежуточное.
-     *
-     * <p><b>Батчинг:</b> вызывается один раз после завершения всей операции сборки/разборки
-     * SubLevel — не на каждый добавленный блок. Источник истины по батчингу здесь;
-     * внутренние функции собственный батчинг не держат.
+     * <b>Атомарность:</b> все три поля обновляются вместе в конце метода.
      *
      * @param subLevel    штуковина, чей корпус изменился
      * @param supportStep константа затухания поддержки балок (TerrraDiverConfig.SUPPORT_STEP)
      */
     public void invalidate_hull_cache(Object subLevel, float supportStep) {
-        // Шаг 1: пересчёт внешней поверхности — база, от неё зависят шаги 2 и 3.
-        // TODO[API-CHECK]: подтвердить сигнатуру compute_exterior_surface(subLevel)
-        Set<BlockPos> newExteriorSurface = computeExteriorSurface(subLevel);
+        invalidate_hull_cache(subLevel, supportStep, DEFAULT_SUB_LEVEL_READER);
+    }
 
-        // Шаг 2: валидные линии балок — зависит от exterior_surface шага 1.
-        // TODO[API-CHECK]: подтвердить сигнатуру find_valid_girder_lines(subLevel, exteriorSurface)
-        List<Object> newGirderLines = findValidGirderLines(subLevel, newExteriorSurface);
+    /**
+     * invalidate_hull_cache() — overload с явным {@code reader} для тестов.
+     *
+     * @param subLevel    штуковина, чей корпус изменился
+     * @param supportStep константа затухания поддержки балок (TerrraDiverConfig.SUPPORT_STEP)
+     * @param reader      читалка SubLevel (инъекция для тестов)
+     */
+    void invalidate_hull_cache(Object subLevel, float supportStep, ISubLevelReader reader) {
+        // Порядок топологический и не переставляемый: каждый шаг читает результат предыдущего.
+        Set<BlockPos> newExteriorSurface = computeExteriorSurface(subLevel, reader);
+        List<Object>  newGirderLines     = findValidGirderLines(subLevel, newExteriorSurface);
+        float         newRibCoverage     = computeRibCoverage(newExteriorSurface, newGirderLines, supportStep);
 
-        // Шаг 3: покрытие балками — зависит от результатов шагов 1 и 2.
-        // Граничный случай: если exterior_surface пуст (открытая конструкция),
-        // compute_rib_coverage вернёт 0.0 штатно, без NPE или деления на ноль — см. TD_06.
-        // TODO[API-CHECK]: подтвердить сигнатуру compute_rib_coverage(exteriorSurface, girderLines, supportStep)
-        float newRibCoverage = computeRibCoverage(newExteriorSurface, newGirderLines, supportStep);
-
-        // Шаг 4: атомарная запись — все три поля обновляются вместе.
-        // Читатели никогда не видят смесь «новый exterior + старый ribCoverage».
+        // Атомарная запись: читатели никогда не видят смесь «новый surface + старый coverage».
         this.exteriorSurface  = newExteriorSurface;
         this.validGirderLines = newGirderLines;
         this.ribCoverage      = newRibCoverage;
@@ -79,7 +263,8 @@ public class HullCache {
      * TODO[IMPL]: реализовать в рамках TD_03 (после compute_exterior_surface).
      * TODO: заменить {@code Object} на тип GirderLine после его определения.
      */
-    private static List<Object> findValidGirderLines(Object subLevel, Set<BlockPos> exteriorSurface) {
+    private static List<Object> findValidGirderLines(Object subLevel,
+                                                      Set<BlockPos> exteriorSurface) {
         // placeholder
         return List.of();
     }
@@ -87,11 +272,14 @@ public class HullCache {
     /**
      * compute_rib_coverage() — доля exterior_surface, покрытая балками (multi-source BFS).
      * TODO[IMPL]: реализовать в рамках TD_03 (после find_valid_girder_lines).
-     * Граничный случай: exteriorSurface пуст → возвращать 0.0, не делить на 0.
+     * Граничный случай: exteriorSurface пуст → 0.0, не делить на ноль.
      */
     private static float computeRibCoverage(Set<BlockPos> exteriorSurface,
                                              List<Object>  validGirderLines,
                                              float         supportStep) {
+        if (exteriorSurface.isEmpty()) {
+            return 0f; // TD_06: открытая конструкция — деление на ноль запрещено
+        }
         // placeholder
         return 0f;
     }
