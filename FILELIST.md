@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-06-24 09:41 UTC_
+_Обновлён: 2026-06-24 11:46 UTC_
 _Ветка: main_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/FILELIST.md_
 
@@ -17,6 +17,8 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/FILELIST.m
 - [src/main/java/com/example/terradiver/physics/IBearingSpeedProvider.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/physics/IBearingSpeedProvider.java)
 - [src/main/java/com/example/terradiver/physics/PhysicsUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/physics/PhysicsUtils.java)
 - [src/main/java/com/example/terradiver/physics/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/physics/package-info.java)
+- [src/main/java/com/example/terradiver/pressure/HullCache.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/pressure/HullCache.java)
+- [src/main/java/com/example/terradiver/pressure/PressureUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/pressure/PressureUtils.java)
 - [src/main/java/com/example/terradiver/pressure/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/pressure/package-info.java)
 - [src/main/java/com/example/terradiver/registry/BlockEntityRegistry.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/registry/BlockEntityRegistry.java)
 - [src/main/java/com/example/terradiver/registry/BlockRegistry.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/registry/BlockRegistry.java)
@@ -24,3 +26,5 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/FILELIST.m
 - [src/main/java/com/example/terradiver/registry/ItemRegistry.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/main/java/com/example/terradiver/registry/ItemRegistry.java)
 - [src/test/java/com/example/terradiver/physics/CrownBlockTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/test/java/com/example/terradiver/physics/CrownBlockTest.java)
 - [src/test/java/com/example/terradiver/physics/PhysicsUtilsTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/test/java/com/example/terradiver/physics/PhysicsUtilsTest.java)
+- [src/test/java/com/example/terradiver/pressure/HullCacheTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/test/java/com/example/terradiver/pressure/HullCacheTest.java)
+- [src/test/java/com/example/terradiver/pressure/PressureUtilsTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/main/src/test/java/com/example/terradiver/pressure/PressureUtilsTest.java)
