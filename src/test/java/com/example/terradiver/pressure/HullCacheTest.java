@@ -1,45 +1,43 @@
 package com.example.terradiver.pressure;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Юнит-тесты для HullCache: compute_exterior_surface (чистое ядро) и invalidate_hull_cache.
- * Спецификация — TD_06 v1.0, TD_03.
+ * Юнит-тесты для HullCache: compute_exterior_surface, find_valid_girder_lines (чистые ядра)
+ * и invalidate_hull_cache (оркестратор). Спецификация — TD_06 v1.0, TD_03.
  *
- * <p><b>Без Minecraft-runtime.</b> Тесты работают исключительно с {@link BlockPos}
- * (лёгкий POJO) и множествами. Никакого Bootstrap, реестров или реальных BlockState —
- * вся MC-специфика ({@code getCollisionShape() == Shapes.block()}) вынесена в адаптер
- * {@code computeExteriorSurface(Object)} и здесь не задействована. Именно это разделение
- * чинит прежний прогон, где тесты падали на загрузке MC-классов
- * (IllegalStateException → ClassNotFoundException).
+ * <p><b>Без Minecraft-runtime.</b> Только {@link BlockPos}, {@link Direction.Axis} и коллекции.
+ * Никакого Bootstrap, реестров или реальных BlockState — MC-специфика вынесена в адаптеры.
  */
-@DisplayName("HullCache — compute_exterior_surface + invalidate_hull_cache")
+@DisplayName("HullCache — exterior_surface + girder_lines + invalidate")
 class HullCacheTest {
 
     private HullCache cache;
     private static final float SUPPORT_STEP = 0.2f;
+    private static final int RAY = 64;
 
     @BeforeEach
     void setUp() {
         cache = new HullCache();
     }
 
-    /** Удобный билдер множества полных кубов. */
     private static Set<BlockPos> solids(BlockPos... positions) {
         return new HashSet<>(List.of(positions));
     }
 
-    /** Сплошной заполненный параллелепипед [x0..x1]×[y0..y1]×[z0..z1]. */
     private static Set<BlockPos> filledBox(int x0, int y0, int z0, int x1, int y1, int z1) {
         Set<BlockPos> s = new HashSet<>();
         for (int x = x0; x <= x1; x++)
@@ -49,133 +47,217 @@ class HullCacheTest {
         return s;
     }
 
+    /** Цепочка балок вдоль X на одной линии (y,z), с заданной блокстейт-осью. */
+    private static Map<BlockPos, Direction.Axis> girdersAlongX(int y, int z, Direction.Axis axis, int... xs) {
+        Map<BlockPos, Direction.Axis> g = new HashMap<>();
+        for (int x : xs) g.put(new BlockPos(x, y, z), axis);
+        return g;
+    }
+
     // ════════════════════════════════════════════════════════════════════════
-    //  compute_exterior_surface — геометрия
+    //  compute_exterior_surface
     // ════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("compute_exterior_surface")
     class ExteriorSurface {
 
-        @Test
-        @DisplayName("один блок → входит в surface")
+        @Test @DisplayName("один блок → входит в surface")
         void singleBlock() {
             BlockPos p = new BlockPos(0, 0, 0);
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(solids(p));
-            assertEquals(Set.of(p), surface);
+            assertEquals(Set.of(p), HullCache.computeExteriorSurface(solids(p)));
         }
 
-        @Test
-        @DisplayName("полоса 3×1×3 → все 9 блоков в surface")
+        @Test @DisplayName("полоса 3x1x3 → все 9 блоков")
         void flatStrip() {
-            // Плоская плита 3×3, толщина 1: каждый блок касается воздуха сверху/снизу → все внешние.
             Set<BlockPos> hull = filledBox(0, 0, 0, 2, 0, 2);
-            assertEquals(9, hull.size(), "контрольная проверка входа");
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(hull);
-            assertEquals(hull, surface, "вся плита — внешняя поверхность");
+            assertEquals(hull, HullCache.computeExteriorSurface(hull));
         }
 
-        @Test
-        @DisplayName("сплошной куб 3×3×3 → ровно 26 внешних блоков (центр исключён)")
-        void solidCubeExcludesCenter() {
-            Set<BlockPos> hull = filledBox(0, 0, 0, 2, 2, 2); // 27 блоков
-            assertEquals(27, hull.size());
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(hull);
-
-            assertEquals(26, surface.size(), "26 внешних из 27");
-            BlockPos center = new BlockPos(1, 1, 1);
-            assertFalse(surface.contains(center),
-                "внутренний блок (центр) НЕ в surface — все 6 соседей сплошные");
+        @Test @DisplayName("сплошной куб 3³ → 26 (центр исключён)")
+        void solidCube() {
+            Set<BlockPos> surface = HullCache.computeExteriorSurface(filledBox(0, 0, 0, 2, 2, 2));
+            assertEquals(26, surface.size());
+            assertFalse(surface.contains(new BlockPos(1, 1, 1)));
         }
 
-        @Test
-        @DisplayName("внутренняя закрытая полость — внутренний блок НЕ в surface")
-        void internalCavityBlockExcluded() {
-            // 5×5×5 сплошной куб: центральный блок (2,2,2) полностью окружён → не поверхность.
-            // Его полость не достижима снаружи, оболочка из полных кубов запечатывает её.
-            Set<BlockPos> hull = filledBox(0, 0, 0, 4, 4, 4);
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(hull);
-
-            assertFalse(surface.contains(new BlockPos(2, 2, 2)),
-                "глубоко внутренний блок не подвергается внешнему давлению");
-            // Внешняя оболочка 5³: 125 − 27(внутренний 3³) = 98.
-            assertEquals(98, surface.size(), "поверхность = оболочка, внутренний объём исключён");
+        @Test @DisplayName("куб 5³ → внутренний блок исключён, оболочка 98")
+        void internalCavity() {
+            Set<BlockPos> surface = HullCache.computeExteriorSurface(filledBox(0, 0, 0, 4, 4, 4));
+            assertFalse(surface.contains(new BlockPos(2, 2, 2)));
+            assertEquals(98, surface.size());
         }
 
-        @Test
-        @DisplayName("запечатанная воздушная полость не создаёт ложную поверхность")
-        void sealedAirCavityDoesNotLeak() {
-            // 3×3×3 сплошной куб с вынутым центром: центр — воздух, запертый оболочкой.
-            // Эта внутренняя пустота недостижима снаружи → не должна добавлять/менять surface.
-            Set<BlockPos> hull = filledBox(0, 0, 0, 2, 2, 2);
-            hull.remove(new BlockPos(1, 1, 1)); // 26 блоков-оболочка вокруг пустого центра
-
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(hull);
-            // Все 26 блоков оболочки касаются ВНЕШНЕГО воздуха (это всего лишь тонкая корка),
-            // поэтому все 26 — поверхность; внутренняя полость на это не влияет.
-            assertEquals(hull, surface);
-            assertFalse(surface.contains(new BlockPos(1, 1, 1)),
-                "пустая клетка-полость не входит в surface (возвращаются только блоки)");
-        }
-
-        @Test
-        @DisplayName("две изолированные структуры → обе дают surface")
-        void twoIsolatedStructures() {
-            BlockPos a = new BlockPos(0, 0, 0);
-            BlockPos b = new BlockPos(10, 0, 0); // далеко, разделены воздухом
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(solids(a, b));
-            assertTrue(surface.contains(a), "первая структура в surface");
-            assertTrue(surface.contains(b), "вторая структура в surface");
+        @Test @DisplayName("две изолированные структуры → обе в surface")
+        void twoIsolated() {
+            Set<BlockPos> surface = HullCache.computeExteriorSurface(
+                solids(new BlockPos(0, 0, 0), new BlockPos(10, 0, 0)));
             assertEquals(2, surface.size());
         }
 
-        @Test
-        @DisplayName("воздушный блок (отсутствующий) не входит в surface")
-        void airBlockNotInSurface() {
-            // Вход содержит только полные кубы. Любая позиция вне множества — воздух/частичный
-            // блок и не может попасть в surface. Проверяем, что соседняя пустая клетка отсутствует.
-            BlockPos p = new BlockPos(0, 0, 0);
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(solids(p));
-            assertFalse(surface.contains(new BlockPos(1, 0, 0)),
-                "пустая (воздушная) клетка не может быть поверхностью");
-            assertFalse(surface.contains(new BlockPos(0, 1, 0)));
+        @Test @DisplayName("пустой/null → пустой surface")
+        void empty() {
+            assertTrue(HullCache.computeExteriorSurface(Set.of()).isEmpty());
+            assertTrue(HullCache.computeExteriorSurface(null).isEmpty());
         }
 
-        @Test
-        @DisplayName("пустой/null вход → пустой surface (открытая конструкция)")
-        void emptyInput() {
-            assertTrue(HullCache.computeExteriorSurface(Set.of()).isEmpty(),
-                "пустой корпус → пустая поверхность");
-            assertTrue(HullCache.computeExteriorSurface(null).isEmpty(),
-                "null → пустая поверхность, без NPE");
-        }
-
-        @Test
-        @DisplayName("детерминированность — повторный вызов даёт тот же результат")
+        @Test @DisplayName("детерминированность")
         void deterministic() {
             Set<BlockPos> hull = filledBox(0, 0, 0, 2, 2, 2);
-            Set<BlockPos> first  = HullCache.computeExteriorSurface(hull);
-            Set<BlockPos> second = HullCache.computeExteriorSurface(hull);
-            assertEquals(first, second);
+            assertEquals(HullCache.computeExteriorSurface(hull), HullCache.computeExteriorSurface(hull));
         }
 
-        @Test
-        @DisplayName("результат immutable")
-        void resultImmutable() {
+        @Test @DisplayName("результат immutable")
+        void immutable() {
             Set<BlockPos> surface = HullCache.computeExteriorSurface(solids(new BlockPos(0, 0, 0)));
-            assertThrows(UnsupportedOperationException.class,
-                () -> surface.add(new BlockPos(5, 5, 5)),
-                "результат compute_exterior_surface должен быть неизменяемым");
+            assertThrows(UnsupportedOperationException.class, () -> surface.add(new BlockPos(5, 5, 5)));
         }
 
-        @Test
-        @DisplayName("отрицательные/смещённые координаты — корректная работа (локальная система)")
-        void negativeCoordinates() {
-            // Локальные координаты SubLevel могут быть отрицательными — индексация это учитывает.
-            Set<BlockPos> hull = filledBox(-3, -3, -3, -1, -1, -1); // 3×3×3, целиком в минусах
-            Set<BlockPos> surface = HullCache.computeExteriorSurface(hull);
+        @Test @DisplayName("отрицательные координаты")
+        void negativeCoords() {
+            Set<BlockPos> surface = HullCache.computeExteriorSurface(filledBox(-3, -3, -3, -1, -1, -1));
             assertEquals(26, surface.size());
-            assertFalse(surface.contains(new BlockPos(-2, -2, -2)), "центр исключён и в минусах");
+            assertFalse(surface.contains(new BlockPos(-2, -2, -2)));
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  find_valid_girder_lines
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("find_valid_girder_lines")
+    class GirderLines {
+
+        @Test @DisplayName("валидная распорка между двумя стенами по X → 1 линия")
+        void validBrace() {
+            Set<BlockPos> solid = solids(new BlockPos(-1, 0, 0), new BlockPos(4, 0, 0));
+            Set<BlockPos> voids = HullCache.computeExteriorVoid(solid);
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0, 1, 2, 3);
+
+            List<GirderLine> lines = HullCache.findValidGirderLines(g, solid, voids, RAY);
+            assertEquals(1, lines.size());
+            GirderLine l = lines.get(0);
+            assertEquals(Direction.Axis.X, l.axis());
+            assertEquals(new BlockPos(0, 0, 0), l.anchorA());
+            assertEquals(new BlockPos(3, 0, 0), l.anchorB());
+        }
+
+        @Test @DisplayName("цепочка длины 1 → 0 линий")
+        void lengthOne() {
+            Set<BlockPos> solid = solids(new BlockPos(-1, 0, 0), new BlockPos(1, 0, 0));
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0);
+            assertTrue(HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY).isEmpty());
+        }
+
+        @Test @DisplayName("торец в толстую стену (за W ещё блок) → 0 линий")
+        void thickWall() {
+            Set<BlockPos> solid = solids(new BlockPos(-1, 0, 0),
+                new BlockPos(3, 0, 0), new BlockPos(4, 0, 0), new BlockPos(5, 0, 0));
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0, 1);
+            assertTrue(HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY).isEmpty());
+        }
+
+        @Test @DisplayName("один торец без стены → 0 линий (нужны оба)")
+        void oneEndOnly() {
+            Set<BlockPos> solid = solids(new BlockPos(4, 0, 0)); // стена только справа
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0, 1, 2, 3);
+            assertTrue(HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY).isEmpty());
+        }
+
+        @Test @DisplayName("две параллельные линии → 2 линии")
+        void twoParallel() {
+            Set<BlockPos> solid = solids(
+                new BlockPos(-1, 0, 0), new BlockPos(4, 0, 0),
+                new BlockPos(-1, 0, 2), new BlockPos(4, 0, 2));
+            Map<BlockPos, Direction.Axis> g = new HashMap<>();
+            g.putAll(girdersAlongX(0, 0, Direction.Axis.X, 0, 1, 2, 3));
+            g.putAll(girdersAlongX(0, 2, Direction.Axis.X, 0, 1, 2, 3));
+            assertEquals(2, HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY).size());
+        }
+
+        @Test @DisplayName("блокстейт-ось ≠ геометрия ряда → 0 линий")
+        void axisMismatch() {
+            // Балки в ряд по X, но ось=Y → по Y каждая одиночка → цепочки длины 1.
+            Set<BlockPos> solid = solids(new BlockPos(-1, 0, 0), new BlockPos(4, 0, 0));
+            var g = girdersAlongX(0, 0, Direction.Axis.Y, 0, 1, 2, 3);
+            assertTrue(HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY).isEmpty());
+        }
+
+        @Test @DisplayName("неполная перегородка прозрачна → 1 линия")
+        void partialPartitionTransparent() {
+            // Перегородки в x=2 НЕТ в solids (неполный блок) → луч проходит сквозь до стен.
+            Set<BlockPos> solid = solids(new BlockPos(-1, 0, 0), new BlockPos(6, 0, 0));
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0, 1, 2, 3, 4, 5);
+            assertEquals(1, HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY).size());
+        }
+
+        @Test @DisplayName("закрытый корпус: балка кабина→внешняя стена → 1 линия")
+        void cabinToOuterWall() {
+            // Полая оболочка 5³; балка внутри по X упирается в стены оболочки изнутри.
+            Set<BlockPos> shell = new HashSet<>();
+            for (int x = 0; x < 5; x++)
+                for (int y = 0; y < 5; y++)
+                    for (int z = 0; z < 5; z++)
+                        if (x == 0 || x == 4 || y == 0 || y == 4 || z == 0 || z == 4)
+                            shell.add(new BlockPos(x, y, z));
+            var g = girdersAlongX(2, 2, Direction.Axis.X, 1, 2, 3);
+            assertEquals(1, HullCache.findValidGirderLines(g, shell, HullCache.computeExteriorVoid(shell), RAY).size());
+        }
+
+        @Test @DisplayName("внутренняя перегородка между комнатами → 0 линий")
+        void internalPartitionInvalid() {
+            // Корпус 7×5×5, внутри полный-куб стена x=3 делит на две комнаты.
+            Set<BlockPos> hull = new HashSet<>();
+            for (int x = 0; x < 7; x++)
+                for (int y = 0; y < 5; y++)
+                    for (int z = 0; z < 5; z++)
+                        if (x == 0 || x == 6 || y == 0 || y == 4 || z == 0 || z == 4)
+                            hull.add(new BlockPos(x, y, z));
+            for (int y = 1; y < 4; y++)
+                for (int z = 1; z < 4; z++)
+                    hull.add(new BlockPos(3, y, z)); // внутренняя перегородка
+            // Балка в левой комнате, торец B к перегородке x=3; за ней — ВНУТРЕННЯЯ пустота.
+            var g = girdersAlongX(2, 2, Direction.Axis.X, 1, 2);
+            assertTrue(HullCache.findValidGirderLines(g, hull, HullCache.computeExteriorVoid(hull), RAY).isEmpty());
+        }
+
+        @Test @DisplayName("вертикальная распорка по Y → 1 линия")
+        void verticalY() {
+            Set<BlockPos> solid = solids(new BlockPos(0, -1, 0), new BlockPos(0, 4, 0));
+            Map<BlockPos, Direction.Axis> g = new HashMap<>();
+            for (int y = 0; y <= 3; y++) g.put(new BlockPos(0, y, 0), Direction.Axis.Y);
+            List<GirderLine> lines = HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY);
+            assertEquals(1, lines.size());
+            assertEquals(Direction.Axis.Y, lines.get(0).axis());
+        }
+
+        @Test @DisplayName("балка в пустоту (нет стен) → 0 линий")
+        void intoVoid() {
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0, 1);
+            assertTrue(HullCache.findValidGirderLines(g, Set.of(), Set.of(), RAY).isEmpty());
+        }
+
+        @Test @DisplayName("дальность луча ограничивает: стена дальше maxRange → 0 линий")
+        void rayRangeLimit() {
+            Set<BlockPos> solid = solids(new BlockPos(-1, 0, 0), new BlockPos(100, 0, 0));
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0, 1, 2, 3);
+            // Правая стена на x=100, дальше короткого луча от торца B (x=3) → торец B невалиден.
+            assertTrue(HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), 5).isEmpty());
+        }
+
+        @Test @DisplayName("пустой ввод балок → пустой список")
+        void emptyGirders() {
+            assertTrue(HullCache.findValidGirderLines(Map.of(), Set.of(), Set.of(), RAY).isEmpty());
+        }
+
+        @Test @DisplayName("результат immutable")
+        void immutableResult() {
+            Set<BlockPos> solid = solids(new BlockPos(-1, 0, 0), new BlockPos(4, 0, 0));
+            var g = girdersAlongX(0, 0, Direction.Axis.X, 0, 1, 2, 3);
+            List<GirderLine> lines = HullCache.findValidGirderLines(g, solid, HullCache.computeExteriorVoid(solid), RAY);
+            assertThrows(UnsupportedOperationException.class,
+                () -> lines.add(new GirderLine(Direction.Axis.X, new BlockPos(0, 0, 0), new BlockPos(1, 0, 0))));
         }
     }
 
@@ -187,77 +269,93 @@ class HullCacheTest {
     @DisplayName("invalidate_hull_cache")
     class Invalidate {
 
-        @Test
-        @DisplayName("начальное состояние: кэши пусты/нулевые до первой инвалидации")
+        @Test @DisplayName("начальное состояние: кэши пусты/нулевые")
         void initialState() {
-            assertNotNull(cache.getExteriorSurface());
             assertTrue(cache.getExteriorSurface().isEmpty());
-            assertNotNull(cache.getValidGirderLines());
             assertTrue(cache.getValidGirderLines().isEmpty());
             assertEquals(0f, cache.getRibCoverage(), 0.001f);
         }
 
-        @Test
-        @DisplayName("не бросает исключений на Object-заглушке SubLevel")
-        void doesNotThrowOnStubSubLevel() {
+        @Test @DisplayName("не бросает на Object-заглушке SubLevel")
+        void doesNotThrow() {
             assertDoesNotThrow(() -> cache.invalidate_hull_cache(new Object(), SUPPORT_STEP));
         }
 
-        @Test
-        @DisplayName("после вызова все три кэша согласованы (не null, ribCoverage ∈ [0,1])")
-        void cachesConsistentAfterInvalidation() {
+        @Test @DisplayName("после вызова кэши согласованы")
+        void consistent() {
             cache.invalidate_hull_cache(new Object(), SUPPORT_STEP);
-            assertNotNull(cache.getExteriorSurface());
-            assertNotNull(cache.getValidGirderLines());
-            float cov = cache.getRibCoverage();
-            assertTrue(cov >= 0f && cov <= 1f, "ribCoverage в [0,1]");
-        }
-
-        @Test
-        @DisplayName("открытый корпус (адаптер-заглушка пуст) → ribCoverage = 0.0")
-        void openStructureRibCoverageZero() {
-            cache.invalidate_hull_cache(new Object(), SUPPORT_STEP);
-            assertEquals(0f, cache.getRibCoverage(), 0.001f);
-        }
-
-        @Test
-        @DisplayName("повторная инвалидация перезаписывает все три кэша без рассинхрона")
-        void repeatedInvalidationOverwritesAll() {
-            cache.invalidate_hull_cache(new Object(), SUPPORT_STEP);
-            cache.invalidate_hull_cache(new Object(), SUPPORT_STEP * 2);
             assertNotNull(cache.getExteriorSurface());
             assertNotNull(cache.getValidGirderLines());
             float cov = cache.getRibCoverage();
             assertTrue(cov >= 0f && cov <= 1f);
         }
 
-        @Test
-        @DisplayName("supportStep = 0 → не бросает исключений")
-        void zeroSupportStep() {
-            assertDoesNotThrow(() -> cache.invalidate_hull_cache(new Object(), 0f));
+        @Test @DisplayName("открытый корпус → ribCoverage = 0.0")
+        void openStructure() {
+            cache.invalidate_hull_cache(new Object(), SUPPORT_STEP);
+            assertEquals(0f, cache.getRibCoverage(), 0.001f);
         }
 
-        @Test
-        @DisplayName("supportStep отрицательный → не бросает исключений")
-        void negativeSupportStep() {
+        @Test @DisplayName("повторная инвалидация без рассинхрона")
+        void repeated() {
+            cache.invalidate_hull_cache(new Object(), SUPPORT_STEP);
+            cache.invalidate_hull_cache(new Object(), SUPPORT_STEP * 2);
+            assertTrue(cache.getRibCoverage() >= 0f && cache.getRibCoverage() <= 1f);
+        }
+
+        @Test @DisplayName("supportStep 0 и отрицательный → не бросает")
+        void edgeSupportStep() {
+            assertDoesNotThrow(() -> cache.invalidate_hull_cache(new Object(), 0f));
             assertDoesNotThrow(() -> cache.invalidate_hull_cache(new Object(), -0.1f));
         }
 
-        @Test
-        @DisplayName("getExteriorSurface: возвращает неизменяемую коллекцию")
-        void exteriorSurfaceImmutable() {
+        @Test @DisplayName("getters возвращают immutable")
+        void gettersImmutable() {
             cache.invalidate_hull_cache(new Object(), SUPPORT_STEP);
-            Set<BlockPos> surface = cache.getExteriorSurface();
             assertThrows(UnsupportedOperationException.class,
-                () -> surface.add(new BlockPos(0, 0, 0)));
-        }
-
-        @Test
-        @DisplayName("getValidGirderLines: возвращает неизменяемую коллекцию")
-        void validGirderLinesImmutable() {
-            cache.invalidate_hull_cache(new Object(), SUPPORT_STEP);
-            List<Object> lines = cache.getValidGirderLines();
-            assertThrows(UnsupportedOperationException.class, () -> lines.add(new Object()));
+                () -> cache.getExteriorSurface().add(new BlockPos(0, 0, 0)));
+            assertThrows(UnsupportedOperationException.class,
+                () -> cache.getValidGirderLines().add(new GirderLine(Direction.Axis.X, new BlockPos(0, 0, 0), new BlockPos(1, 0, 0))));
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  GirderLine — инвариант типа
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("GirderLine — инвариант")
+    class GirderLineType {
+
+        @Test @DisplayName("валидная линия конструируется")
+        void valid() {
+            GirderLine l = new GirderLine(Direction.Axis.X, new BlockPos(0, 0, 0), new BlockPos(3, 0, 0));
+            assertEquals(List.of(new BlockPos(0, 0, 0), new BlockPos(3, 0, 0)), l.anchors());
+        }
+
+        @Test @DisplayName("невыровненные торцы → IllegalArgumentException")
+        void notCollinear() {
+            assertThrows(IllegalArgumentException.class,
+                () -> new GirderLine(Direction.Axis.X, new BlockPos(0, 0, 0), new BlockPos(3, 1, 0)));
+        }
+
+        @Test @DisplayName("перевёрнутый порядок (A не раньше B) → IllegalArgumentException")
+        void reversed() {
+            assertThrows(IllegalArgumentException.class,
+                () -> new GirderLine(Direction.Axis.X, new BlockPos(3, 0, 0), new BlockPos(0, 0, 0)));
+        }
+
+        @Test @DisplayName("нулевая длина (A == B) → IllegalArgumentException")
+        void zeroLength() {
+            assertThrows(IllegalArgumentException.class,
+                () -> new GirderLine(Direction.Axis.X, new BlockPos(0, 0, 0), new BlockPos(0, 0, 0)));
+        }
+
+        @Test @DisplayName("null → NullPointerException")
+        void nulls() {
+            assertThrows(NullPointerException.class,
+                () -> new GirderLine(null, new BlockPos(0, 0, 0), new BlockPos(1, 0, 0)));
+        }
+    }
+
 }
