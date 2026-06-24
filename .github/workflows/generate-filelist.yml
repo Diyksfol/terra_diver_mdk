@@ -2,8 +2,8 @@ name: Generate File List
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:      # можно запустить вручную из GitHub UI
+    branches: [main, test]
+  workflow_dispatch:
 
 jobs:
   generate:
@@ -14,25 +14,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build FILELIST.md
+      - name: Detect branch
+        id: vars
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          if [ "$BRANCH" = "main" ]; then
+            OUTPUT="FILELIST.md"
+          else
+            OUTPUT="FILELIST_${BRANCH^^}.md"
+          fi
+          echo "branch=$BRANCH"   >> $GITHUB_OUTPUT
+          echo "output=$OUTPUT"   >> $GITHUB_OUTPUT
+
+      - name: Build file list
         run: |
           REPO="Diyksfol/terra_diver_mdk"
-          BRANCH="main"
+          BRANCH="${{ steps.vars.outputs.branch }}"
+          OUTPUT="${{ steps.vars.outputs.output }}"
           BASE="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
 
           {
             echo "# File List — ${REPO}"
             echo "_Обновлён: $(date -u '+%Y-%m-%d %H:%M UTC')_"
+            echo "_Ветка: ${BRANCH}_"
+            echo "_Raw: ${BASE}/${OUTPUT}_"
             echo ""
             find src -name "*.java" | sort | while read f; do
               echo "- [${f}](${BASE}/${f})"
             done
-          } > FILELIST.md
+          } > "$OUTPUT"
 
       - name: Commit
         run: |
+          OUTPUT="${{ steps.vars.outputs.output }}"
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add FILELIST.md
-          git diff --staged --quiet || git commit -m "chore: update FILELIST"
+          git add "$OUTPUT"
+          git diff --staged --quiet || git commit -m "chore: update ${OUTPUT}"
           git push
