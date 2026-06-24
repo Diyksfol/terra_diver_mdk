@@ -1,6 +1,7 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-06-24 09:34 UTC_
+_Обновлён: 2026-06-24 09:42 UTC_
 _Ветка: test_
+_Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
 - [src/main/java/com/example/terradiver/TerraDiver.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/TerraDiver.java)
 - [src/main/java/com/example/terradiver/block/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/block/package-info.java)
