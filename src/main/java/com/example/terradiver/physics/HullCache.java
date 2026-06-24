@@ -75,16 +75,6 @@ public class HullCache {
     // ── Заглушки зависимых функций (реализуются в рамках TD_03) ──────────────────
 
     /**
-     * compute_exterior_surface() — flood-fill по локальным координатам SubLevel.
-     * TODO[IMPL]: реализовать в рамках TD_03 (следующая функция в графе зависимостей).
-     * TODO[API-CHECK]: проверить доступ к блокам SubLevel в локальных координатах.
-     */
-    private static Set<BlockPos> computeExteriorSurface(Object subLevel) {
-        // placeholder — flood-fill не реализован
-        return Set.of();
-    }
-
-    /**
      * find_valid_girder_lines() — поиск валидных линий балок жёсткости.
      * TODO[IMPL]: реализовать в рамках TD_03 (после compute_exterior_surface).
      * TODO: заменить {@code Object} на тип GirderLine после его определения.
