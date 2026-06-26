@@ -15,12 +15,12 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
+/*
  * Юнит-тесты для HullCache: compute_exterior_surface, find_valid_girder_lines (чистые ядра)
  * и invalidate_hull_cache (оркестратор). Спецификация — TD_06 v1.0, TD_03.
  *
- * <p><b>Без Minecraft-runtime.</b> Только {@link BlockPos}, {@link Direction.Axis} и коллекции.
- * Никакого Bootstrap, реестров или реальных BlockState — MC-специфика вынесена в адаптеры.
+ * Без Minecraft-runtime: только BlockPos, Direction.Axis и коллекции. Никакого Bootstrap,
+ * реестров или реальных BlockState — MC-специфика вынесена в адаптеры.
  */
 @DisplayName("HullCache — exterior_surface + girder_lines + invalidate")
 class HullCacheTest {
@@ -358,4 +358,43 @@ class HullCacheTest {
         }
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  RibCoverage — покрытие
+    // ════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("compute_rib_coverage")
+    class RibCoverage {
+        private static final float STEP = 0.2f;
+
+        private GirderLine lineX(int x0, int x1) {
+            return new GirderLine(Direction.Axis.X, new BlockPos(x0, 0, 0), new BlockPos(x1, 0, 0));
+        }
+
+        @Test @DisplayName("пустая поверхность → 0.0")
+        void emptySurface() {
+            assertEquals(0f, HullCache.computeRibCoverage(Set.of(), List.of(lineX(0, 4)), STEP), 1e-6f);
+        }
+
+        @Test @DisplayName("нет линий → 0.0")
+        void noLines() {
+            Set<BlockPos> surf = new HashSet<>();
+            for (int i = 0; i < 5; i++) surf.add(new BlockPos(i, 0, 0));
+            assertEquals(0f, HullCache.computeRibCoverage(surf, List.of(), STEP), 1e-6f);
+        }
+
+        @Test @DisplayName("линия 0..4, STEP 0.2 → всё покрыто (1.0)")
+        void fullyCovered() {
+            Set<BlockPos> surf = new HashSet<>();
+            for (int i = 0; i < 5; i++) surf.add(new BlockPos(i, 0, 0));
+            assertEquals(1.0f, HullCache.computeRibCoverage(surf, List.of(lineX(0, 4)), STEP), 1e-6f);
+        }
+
+        @Test @DisplayName("STEP 0.6 → центр непокрыт → 0.8")
+        void centerUncovered() {
+            Set<BlockPos> surf = new HashSet<>();
+            for (int i = 0; i < 5; i++) surf.add(new BlockPos(i, 0, 0));
+            assertEquals(0.8f, HullCache.computeRibCoverage(surf, List.of(lineX(0, 4)), 0.6f), 1e-6f);
+        }
+    }
 }

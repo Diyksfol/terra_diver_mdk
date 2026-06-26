@@ -36,4 +36,40 @@ public class PressureUtils {
         // Шаг 3: клампим до использования в вышестоящих расчётах.
         return Math.max(0f, Math.min(1f, raw));
     }
+
+    /*
+     * compute_pressure_debuff_effective — итоговый множитель скорости бурения с учётом давления
+     * и компенсации рёбрами жёсткости. См. TD_06 v1.0, compute_pressure_debuff_effective.
+     *
+     * Кламп 0.1 применяется ЗДЕСЬ, после компенсации (не в compute_raw_debuff) — иначе показания
+     * Pressure Gauge (TD_04) исказятся артефактом клампа rate-системы.
+     */
+    public static float compute_pressure_debuff_effective(float rawDebuff, float ribCoverage,
+                                                          float maxCompensation) {
+        float penalty = 1f - rawDebuff;                                  // штраф давления
+        float compensated = penalty * (1f - ribCoverage * maxCompensation); // рёбра гасят часть штрафа
+        float result = 1f - compensated;
+        return Math.max(0.1f, Math.min(1.0f, result));
+    }
+
+    /*
+     * compute_ambient_signal_volume — громкость атмосферного скрежета (Ambient Depth Signal)
+     * по глубине и покрытию рёбрами. См. TD_06 v1.0, compute_ambient_signal_volume.
+     *
+     * Сама функция не решает, активен ли сигнал — это делает вызывающий код (Y <= DEEPSLATE_Y И
+     * Dive Mode); здесь честный ноль на нерелевантной глубине.
+     */
+    public static float compute_ambient_signal_volume(float y, float deepslateY, float bedrockY,
+                                                      float ribCoverage, float soundDamping) {
+        float depth = Math.max(0f, deepslateY - y);
+        float maxDepth = deepslateY - bedrockY;
+        float depthFraction = Math.min(1.0f, depth / maxDepth);
+
+        // f(depth_fraction): конкретная кривая — балансовый выбор TD_05. Линейный ориентир (raw =
+        // depth_fraction); если на плейтесте выберут степенную — менять только эту строку.
+        float rawVolume = depthFraction;
+
+        float volume = rawVolume * (1f - ribCoverage * soundDamping); // рёбра приглушают скрежет
+        return Math.max(0.0f, Math.min(1.0f, volume));
+    }
 }

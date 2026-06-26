@@ -11,70 +11,50 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashMap;
 
-/**
- * Кэш трёх взаимосвязанных характеристик корпуса штуковины (TD_03):
- * {@code exterior_surface}, {@code valid_girder_lines}, {@code rib_coverage}.
+/*
+ * Кэш трёх характеристик корпуса (TD_03): exterior_surface, valid_girder_lines, rib_coverage.
+ * Единственный оркестратор инвалидации — invalidate_hull_cache. Читатели обращаются к геттерам.
  *
- * <p>Единственный оркестратор инвалидации — {@link #invalidate_hull_cache}.
- * Читатели ({@code compute_pressure_debuff_effective}, {@code compute_ambient_signal_volume},
- * {@code compute_pressure_gauge_needles}) обращаются к геттерам, не пересчитывая.
- *
- * <p><b>Архитектура.</b> Тяжёлые алгоритмы TD_03 разделены на два слоя, чтобы их можно было
- * юнит-тестировать без запущенного Minecraft:
- * <ul>
- *   <li><b>Чистые ядра</b> ({@link #computeExteriorVoid}, {@link #computeExteriorSurface},
- *       {@link #findValidGirderLines}) — работают с {@link BlockPos}/{@link Direction.Axis}
- *       и коллекциями. Зависят только от лёгких POJO MC, грузятся в тестах. Вся геометрия здесь.</li>
- *   <li><b>Тонкие MC-адаптеры</b> ({@link #extractSolidFullCubes}, {@link #extractGirders}) —
- *       единственная MC-специфика: перечислить блоки SubLevel и прочитать их свойства.
- *       Проверяются в игре, не юнит-тестом.</li>
- * </ul>
- * Спецификация — TD_06 v1.0, TD_03.
+ * Архитектура: тяжёлые алгоритмы разделены на чистые ядра (computeExteriorVoid,
+ * computeExteriorSurface, findValidGirderLines — работают с BlockPos/Axis и коллекциями,
+ * грузятся в тестах без MC) и тонкие MC-адаптеры (extractSolidFullCubes, extractGirders —
+ * перебор блоков SubLevel, проверяются в игре). Спецификация — TD_06 v1.0, TD_03.
  */
 public class HullCache {
 
-    // 6-связность (грани): распространение пустоты (шаг 1) и соседство (шаг 2) в TD_06.
+    // 6-связность (грани): распространение пустоты и соседство.
     private static final int[][] FACE_OFFSETS = {
         { 1, 0, 0}, {-1, 0, 0},
         { 0, 1, 0}, { 0,-1, 0},
         { 0, 0, 1}, { 0, 0,-1},
     };
 
-    // Максимальная дальность луча торца балки (шаг 3b). TODO[CONFIG]: вынести в TerrraDiverConfig.
+    // Максимальная дальность луча торца балки. TODO[CONFIG]: вынести в TerrraDiverConfig.
     private static final int DEFAULT_GIRDER_RAY_MAX_RANGE = 64;
 
-    // Три кэша обновляются только атомарно через invalidate_hull_cache().
-    // volatile — видимость между тиками (физический тик и потенциальные читатели).
+    // Обновляются только атомарно через invalidate_hull_cache(). volatile — видимость между тиками.
     private volatile Set<BlockPos>     exteriorSurface  = Set.of();
     private volatile List<GirderLine>  validGirderLines = List.of();
     private volatile float             ribCoverage      = 0f;
 
-    /** Внешняя поверхность корпуса (локальные координаты SubLevel). */
     public Set<BlockPos>    getExteriorSurface()  { return exteriorSurface; }
-
-    /** Валидные линии балок жёсткости. */
     public List<GirderLine> getValidGirderLines() { return validGirderLines; }
-
-    /** Доля внешней поверхности, покрытая балками жёсткости, [0.0, 1.0]. */
     public float            getRibCoverage()      { return ribCoverage; }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  compute_exterior_surface() — чистое ядро (+ внешняя пустота)
+    //  compute_exterior_surface (+ внешняя пустота)
     // ════════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Множество клеток «внешней пустоты» — пустота, достижимая снаружи структуры (flood-fill
-     * от угла bounding box, расширенного на 1). Внутренние полости сюда НЕ попадают: они
-     * отрезаны корпусом и от внешнего угла недостижимы. Локальные координаты SubLevel.
+    /*
+     * Клетки «внешней пустоты» — пустота, достижимая снаружи структуры (flood-fill от угла
+     * bounding box, расширенного на 1). Внутренние полости недостижимы и сюда не попадают.
+     * Локальные координаты SubLevel.
      *
-     * <p>Это промежуточный результат: {@link #computeExteriorSurface} выводит из него
-     * поверхность, а {@link #findValidGirderLines} использует его для проверки нормали торца
-     * (нужно знать, где ВНЕШНЯЯ пустота, а не любой воздух). Не кэшируется — живёт только
-     * в пределах одного пересчёта {@link #invalidate_hull_cache}.
-     *
-     * @param solidFullCubes позиции блоков с полной кубической коллизией (локальные координаты)
-     * @return неизменяемое множество клеток внешней пустоты
+     * Промежуточный результат: computeExteriorSurface выводит из него поверхность,
+     * findValidGirderLines использует его для проверки нормали торца (нужно знать, где ВНЕШНЯЯ
+     * пустота, а не любой воздух). Не кэшируется — живёт в пределах одного пересчёта.
      */
     public static Set<BlockPos> computeExteriorVoid(Set<BlockPos> solidFullCubes) {
         if (solidFullCubes == null || solidFullCubes.isEmpty()) {
@@ -128,23 +108,19 @@ public class HullCache {
         return Set.copyOf(voidCells);
     }
 
-    /**
-     * compute_exterior_surface() — блоки корпуса, граничащие с внешней пустотой.
-     * Спецификация: TD_06 v1.0, TD_03. Обоснование (внутренние полости, локальная система
-     * координат, почему вход — только полные кубы) — в TD_06 и в комментарии
-     * {@link #computeExteriorVoid}.
-     *
-     * @param solidFullCubes позиции блоков с полной кубической коллизией (локальные координаты)
-     * @return неизменяемое множество позиций внешней поверхности
+    /*
+     * compute_exterior_surface — блоки корпуса, граничащие с внешней пустотой.
+     * Назначение, граничные случаи, обоснование локальной системы координат — см. TD_06 v1.0,
+     * compute_exterior_surface.
      */
     public static Set<BlockPos> computeExteriorSurface(Set<BlockPos> solidFullCubes) {
         if (solidFullCubes == null || solidFullCubes.isEmpty()) {
-            return Set.of(); // открытая/пустая конструкция → поверхности нет (TD_06)
+            return Set.of(); // открытая/пустая конструкция (см. TD_06)
         }
         return surfaceFromVoid(solidFullCubes, computeExteriorVoid(solidFullCubes));
     }
 
-    /** Блок поверхности ⟺ хотя бы один из 6 соседей — внешняя пустота (шаг 2 TD_06). */
+    // Блок поверхности, если хотя бы один из 6 соседей — внешняя пустота (шаг 2, TD_06).
     private static Set<BlockPos> surfaceFromVoid(Set<BlockPos> solidFullCubes,
                                                  Set<BlockPos> exteriorVoid) {
         Set<BlockPos> surface = new HashSet<>();
@@ -159,48 +135,25 @@ public class HullCache {
         return Set.copyOf(surface);
     }
 
-    /** Совершённый индекс клетки внутри расширенного box: коллизий нет по построению. */
+    // Совершённый индекс клетки внутри расширенного box: коллизий нет по построению.
     private static int idx(int x, int y, int z, int sizeY, int sizeZ) {
         return (x * sizeY + y) * sizeZ + z;
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  find_valid_girder_lines() — чистое ядро
+    //  find_valid_girder_lines
     // ════════════════════════════════════════════════════════════════════════════
 
-    /**
-     * find_valid_girder_lines() — <b>чистое ядро</b>. Валидные линии балок жёсткости: прямые
-     * цепочки {@code metal_girder} вдоль одной оси, ОБА торца которых перпендикулярно упираются
-     * во внешнюю стену корпуса. Спецификация: TD_06 v1.0, TD_03.
+    /*
+     * find_valid_girder_lines — валидные линии балок жёсткости. Назначение, шаги логики
+     * и граничные случаи — см. TD_06 v1.0, find_valid_girder_lines.
      *
-     * <p><b>Алгоритм</b> (шаги по TD_06):
-     * <ol>
-     *   <li>Сгруппировать балки в непрерывные прямые цепочки по их осевому блокстейту
-     *       (минимум 2 блока). Цепочка по оси A — последовательные по A балки с блокстейт-осью A.</li>
-     *   <li>Для каждого торца пустить луч ВДОЛЬ оси наружу. Луч прозрачен для всего, кроме полных
-     *       кубов (неполные блоки/перегородки пропускаются); останавливается на первом блоке из
-     *       {@code solidFullCubes} — это {@code W}.</li>
-     *   <li>Торец валиден ⟺ клетка ЗА {@code W} ({@code W + d}) — внешняя пустота. Это разом
-     *       проверяет «{@code W} ∈ exterior_surface» и «нормаль {@code W} вдоль оси линии».</li>
-     *   <li>Линия валидна ⟺ оба торца валидны.</li>
-     * </ol>
-     *
-     * <p><b>Почему вход — {@code exteriorVoid}, а не {@code exterior_surface}.</b> Спека описывает
-     * нормаль как «направление к ближайшей ВНЕШНЕЙ пустоте». По одному лишь множеству поверхности
-     * нельзя отличить внешнюю грань блока от грани во ВНУТРЕННЮЮ полость — а это различает настоящую
-     * распорку (балка кабина→внешняя стена) от ложной (балка во внутреннюю перегородку между двумя
-     * комнатами). Поэтому ядру передаётся множество внешней пустоты; {@link #invalidate_hull_cache}
-     * считает его один раз и кэширует уже выведенную из него поверхность.
-     *
-     * <p><b>Граничные случаи (TD_06):</b> параллельная/толстая стена (за {@code W} снова блок →
-     * невалид); неполная перегородка прозрачна для луча; цепочка длины 1 отброшена; балка в пустоту
-     * невалидна; параллельные линии дают разные точки покрытия.
-     *
-     * @param girders        позиция балки → её осевой блокстейт (X/Y/Z)
-     * @param solidFullCubes все полные кубы корпуса (для остановки луча)
-     * @param exteriorVoid   множество клеток внешней пустоты (для проверки нормали торца)
-     * @param maxRayRange    предел дальности луча торца (отсекает трассы в пустоту)
-     * @return неизменяемый список валидных линий
+     * Отступление от спеки (не в TD_06): на вход идёт exteriorVoid, а не exterior_surface.
+     * Проверка «нормаль торца к ближайшей ВНЕШНЕЙ пустоте» по одному множеству поверхности
+     * невыполнима — нельзя отличить внешнюю грань от грани во внутреннюю полость. Это различает
+     * настоящую распорку (кабина→внешняя стена) от ложной (во внутреннюю перегородку). Торец
+     * валиден, если клетка за первым полным кубом W (W+d) — внешняя пустота; это разом проверяет
+     * и «W в exterior_surface», и «нормаль W вдоль оси линии».
      */
     public static List<GirderLine> findValidGirderLines(Map<BlockPos, Direction.Axis> girders,
                                                         Set<BlockPos> solidFullCubes,
@@ -210,7 +163,7 @@ public class HullCache {
             return List.of();
         }
 
-        // Индекс «ось → её балки» — группировка по блокстейт-оси за O(1) на блок (не O(n²)).
+        // Индекс «ось → её балки» — группировка по блокстейт-оси за O(1) на блок (не O(n^2)).
         Map<Direction.Axis, Set<BlockPos>> byAxis = new EnumMap<>(Direction.Axis.class);
         for (var e : girders.entrySet()) {
             byAxis.computeIfAbsent(e.getValue(), a -> new HashSet<>()).add(e.getKey());
@@ -256,10 +209,10 @@ public class HullCache {
         return List.copyOf(lines);
     }
 
-    /**
-     * Луч от торца наружу (шаги 3b–3c): прозрачен для всего, кроме полных кубов; останавливается
-     * на первом полном кубе {@code W}; торец валиден ⟺ клетка за {@code W} ({@code W + d}) —
-     * внешняя пустота (т.е. {@code W} — внешняя стена, нормаль вдоль оси луча).
+    /*
+     * Луч от торца наружу: прозрачен для всего, кроме полных кубов; останавливается на первом
+     * полном кубе W; торец валиден, если клетка за W (W+d) — внешняя пустота. См. TD_06 v1.0,
+     * find_valid_girder_lines, шаги 3b–3c.
      */
     private static boolean endpointBracesExteriorWall(BlockPos endpoint, int dx, int dy, int dz,
                                                       Set<BlockPos> solidFullCubes,
@@ -273,38 +226,31 @@ public class HullCache {
                 return exteriorVoid.contains(new BlockPos(x + dx, y + dy, z + dz)); // W + d
             }
         }
-        return false; // в пределах дальности стены нет → торец ни на что не опирается
+        return false; // стены в пределах дальности нет → торец ни на что не опирается
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  invalidate_hull_cache() — оркестратор
+    //  invalidate_hull_cache
     // ════════════════════════════════════════════════════════════════════════════
 
-    /**
-     * invalidate_hull_cache() — атомарно пересчитать все три кэша корпуса.
-     * Спецификация: TD_06 v1.0, TD_03.
+    /*
+     * invalidate_hull_cache — атомарно пересчитать три кэша корпуса. Порядок, атомарность,
+     * батчинг — см. TD_06 v1.0, invalidate_hull_cache.
      *
-     * <p><b>Порядок строгий:</b> exterior_surface → girder_lines → rib_coverage. MC-данные
-     * (полные кубы, балки) извлекаются по одному разу; внешняя пустота считается один раз и
-     * переиспользуется для поверхности и для проверки торцов балок.
-     *
-     * <p><b>Атомарность:</b> три поля обновляются одновременно в конце метода.
-     * <p><b>Батчинг:</b> вызывается один раз после завершения сборки/разборки SubLevel.
-     *
-     * @param subLevel    штуковина, чей корпус изменился
-     * @param supportStep константа затухания поддержки балок (TerrraDiverConfig.SUPPORT_STEP)
+     * MC-данные (полные кубы, балки) извлекаются по разу; внешняя пустота считается один раз
+     * и переиспользуется для поверхности и для проверки торцов балок.
      */
     public void invalidate_hull_cache(Object subLevel, float supportStep) {
         // MC-извлечение (по разу).
         Set<BlockPos> solidFullCubes = extractSolidFullCubes(subLevel);
         Map<BlockPos, Direction.Axis> girders = extractGirders(subLevel);
 
-        // Чистые ядра.
-        Set<BlockPos> exteriorVoid    = computeExteriorVoid(solidFullCubes);   // шаг 1 (база)
+        // Чистые ядра (строгий порядок: surface → girder_lines → rib_coverage).
+        Set<BlockPos> exteriorVoid    = computeExteriorVoid(solidFullCubes);
         Set<BlockPos> exteriorSurface = surfaceFromVoid(solidFullCubes, exteriorVoid);
-        List<GirderLine> girderLines  = findValidGirderLines(                  // шаг 2
+        List<GirderLine> girderLines  = findValidGirderLines(
             girders, solidFullCubes, exteriorVoid, DEFAULT_GIRDER_RAY_MAX_RANGE);
-        float ribCov = computeRibCoverage(exteriorSurface, girderLines, supportStep); // шаг 3
+        float ribCov = computeRibCoverage(exteriorSurface, girderLines, supportStep);
 
         // Атомарная запись.
         this.exteriorSurface  = exteriorSurface;
@@ -314,38 +260,85 @@ public class HullCache {
 
     // ── MC-адаптеры (проверяются в игре, не юнит-тестом) ────────────────────────
 
-    /**
+    /*
      * Извлечь позиции блоков с полной кубической коллизией из SubLevel.
      * TODO[API-CHECK]: перебор блоков SubLevel в ЛОКАЛЬНЫХ координатах и сравнение
-     * {@code state.getCollisionShape(...) == Shapes.block()}.
+     * state.getCollisionShape(...) == Shapes.block().
      */
     private static Set<BlockPos> extractSolidFullCubes(Object subLevel) {
         // TODO[API-CHECK]
         return Set.of();
     }
 
-    /**
-     * Извлечь балки {@code create:metal_girder} из SubLevel: позиция → осевой блокстейт.
+    /*
+     * Извлечь балки create:metal_girder из SubLevel: позиция → осевой блокстейт.
      * TODO[API-CHECK]: перебор блоков SubLevel, фильтр по типу metal_girder, чтение свойства
-     * {@code axis} ({@code BlockStateProperties.AXIS}) в локальных координатах. Допущение TD_06
-     * (Проверка A): metal_girder имеет осевой блокстейт и НЕполную коллизию (не попадает в
-     * {@code solidFullCubes}).
+     * axis (BlockStateProperties.AXIS) в локальных координатах. Допущение TD_06 (Проверка A):
+     * metal_girder имеет осевой блокстейт и НЕполную коллизию (не попадает в solidFullCubes).
      */
     private static Map<BlockPos, Direction.Axis> extractGirders(Object subLevel) {
         // TODO[API-CHECK]
         return Map.of();
     }
 
-    // ── Заглушка следующей функции TD_03 ────────────────────────────────────────
-
-    /**
-     * compute_rib_coverage() — доля exterior_surface, покрытая балками (multi-source BFS).
-     * TODO[IMPL]: реализовать (следующая функция графа TD_03, после find_valid_girder_lines).
-     * Граничный случай: exteriorSurface пуст → возвращать 0.0, не делить на 0.
-     */
-    private static float computeRibCoverage(Set<BlockPos> exteriorSurface,
-                                            List<GirderLine> validGirderLines,
-                                            float supportStep) {
-        return 0f; // placeholder
+    /*
+    * compute_rib_coverage — доля exterior_surface, эффективно подкреплённая балками (multi-source BFS).
+    * См. TD_06 v1.0, compute_rib_coverage.
+    *
+    * Отступление от буквы спеки: торцы балок (anchors) — это блоки-балки, НЕ блоки поверхности.
+    * Они используются как источники BFS, но в "covered" считаются ТОЛЬКО блоки exterior_surface —
+    * иначе доля вышла бы за пределы [0,1] (деление-то на |exterior_surface|).
+    */
+    public static float computeRibCoverage(Set<BlockPos> exteriorSurface,
+                                        List<GirderLine> validGirderLines,
+                                        float supportStep) {
+        if (exteriorSurface == null || exteriorSurface.isEmpty()) {
+            return 0f; // нет поверхности → 0.0 (TD_06, защита от деления на ноль)
+        }
+        Map<BlockPos, Float> support = new HashMap<>();
+        for (BlockPos b : exteriorSurface) {
+            support.put(b, 0f);
+        }
+        // Шаг 2: активировать оба торца каждой линии (max, не сумма).
+        Deque<BlockPos> queue = new ArrayDeque<>();
+        if (validGirderLines != null) {
+            for (GirderLine line : validGirderLines) {
+                for (BlockPos anchor : line.anchors()) {
+                    Float prev = support.get(anchor);
+                    if (prev == null || prev < 1f) {
+                        support.put(anchor, 1f);
+                        queue.add(anchor);
+                    }
+                }
+            }
+        }
+        // Шаг 3: multi-source BFS, распространение только по exterior_surface.
+        while (!queue.isEmpty()) {
+            BlockPos cur = queue.poll();
+            float ns = support.get(cur) - supportStep;
+            if (ns <= 0f) {
+                continue; // дальше поддержка иссякла — затухание (естественный ранний выход)
+            }
+            for (int[] d : FACE_OFFSETS) {
+                BlockPos nb = new BlockPos(cur.getX() + d[0], cur.getY() + d[1], cur.getZ() + d[2]);
+                if (!exteriorSurface.contains(nb)) {
+                    continue; // BFS только по поверхности
+                }
+                Float curNb = support.get(nb);
+                if (curNb == null || ns > curNb) {
+                    support.put(nb, ns);
+                    queue.add(nb);
+                }
+            }
+        }
+        // Шаги 4-5: covered — ТОЛЬКО блоки поверхности с support>0.
+        int covered = 0;
+        for (BlockPos b : exteriorSurface) {
+            Float v = support.get(b);
+            if (v != null && v > 0f) {
+                covered++;
+            }
+        }
+        return (float) covered / exteriorSurface.size();
     }
 }
