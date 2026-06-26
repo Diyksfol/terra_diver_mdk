@@ -214,9 +214,9 @@ class DrillingUtilsTest {
             var crowns = List.of(crown(1f, 9f, 0f, ALIGNED), crown(1f, 16f, 5f, ALIGNED));
             assertEquals(9f, DrillingUtils.compute_crown_face_area(crowns, HEADING), 1e-6f);
         }
-        @Test @DisplayName("допуск 1 блок: depth0 + depth1 = один слой")
-        void tolerance() {
-            var crowns = List.of(crown(1f, 9f, 0f, ALIGNED), crown(1f, 4f, 1f, ALIGNED));
+        @Test @DisplayName("передний слой = короны на минимальной глубине; следующее кольцо (depth1) исключено")
+        void frontRingOnly() {
+            var crowns = List.of(crown(1f, 9f, 0f, ALIGNED), crown(1f, 4f, 0f, ALIGNED), crown(1f, 16f, 1f, ALIGNED));
             assertEquals(13f, DrillingUtils.compute_crown_face_area(crowns, HEADING), 1e-6f);
         }
     }
