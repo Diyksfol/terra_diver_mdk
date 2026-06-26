@@ -72,6 +72,20 @@ public final class ResistanceField {
         return crownCenter.subtract(centroid).normalize();
     }
 
+    /*
+     * compute_pushback (TD_02) — МАГНИТУДА выталкивающей силы из накопленного pending_resistance.
+     * См. TD_06, compute_pushback. Чистая, не зависит ни от RPM, ни от Dive Mode — выталкивание
+     * работает и без SU. Направление даёт compute_resistance_direction(); тик-цикл умножает dir*mag.
+     *
+     * Порог PUSHBACK_THRESHOLD отделяет «торможение» (ниже порога pushback=0, тормозит только
+     * resistance_multiplier в compute_drilling_rate) от собственно «выталкивания» (выше порога).
+     */
+    public static float compute_pushback(float pendingResistance, float pushbackThreshold,
+                                         float pushbackFactor, float rateMax) {
+        float pushback = Math.max(0f, pendingResistance - pushbackThreshold) * pushbackFactor;
+        return Math.min(pushback, rateMax); // знак «наружу» добавляет направление в тик-цикле
+    }
+
     // ── Скан контакта: ядро (чистое) ────────────────────────────────────────────
 
     /*

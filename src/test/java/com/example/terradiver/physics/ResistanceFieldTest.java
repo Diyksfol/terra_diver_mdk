@@ -103,6 +103,26 @@ class ResistanceFieldTest {
         }
     }
 
+    // ── compute_pushback ──
+
+    @Nested @DisplayName("compute_pushback")
+    class Pushback {
+        @Test @DisplayName("ниже порога → 0 (только торможение, без выталкивания)")
+        void belowThreshold() { assertEquals(0f, ResistanceField.compute_pushback(5f, 8f, 0.5f, 10f), EPS); }
+
+        @Test @DisplayName("на пороге → 0")
+        void atThreshold() { assertEquals(0f, ResistanceField.compute_pushback(8f, 8f, 0.5f, 10f), EPS); }
+
+        @Test @DisplayName("выше порога → (pending − threshold) × factor")
+        void aboveThreshold() { assertEquals(2.0f, ResistanceField.compute_pushback(12f, 8f, 0.5f, 10f), EPS); }
+
+        @Test @DisplayName("pending 0 → 0 (обычное состояние)")
+        void zeroPending() { assertEquals(0f, ResistanceField.compute_pushback(0f, 8f, 0.5f, 10f), EPS); }
+
+        @Test @DisplayName("кламп сверху RATE_MAX")
+        void clampMax() { assertEquals(10f, ResistanceField.compute_pushback(1000f, 8f, 0.5f, 10f), EPS); }
+    }
+
     // ── интеграция ──
 
     @Test @DisplayName("восьмёрка: нижняя корона в породе → выталкивает ВВЕРХ")
