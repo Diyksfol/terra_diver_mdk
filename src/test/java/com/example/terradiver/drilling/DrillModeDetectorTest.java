@@ -1,11 +1,11 @@
-package com.example.terradiver.physics;
+package com.example.terradiver.drilling;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
-import static com.example.terradiver.physics.DrillMode.*;
+import static com.example.terradiver.drilling.DrillMode.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /*

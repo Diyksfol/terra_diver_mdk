@@ -1,4 +1,4 @@
-package com.example.terradiver.physics;
+package com.example.terradiver.drilling;
 
 import java.util.Optional;
 
