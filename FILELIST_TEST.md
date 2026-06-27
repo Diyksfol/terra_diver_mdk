@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-06-27 05:06 UTC_
+_Обновлён: 2026-06-27 19:13 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -12,14 +12,14 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/config/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/config/package-info.java)
 - [src/main/java/com/example/terradiver/datagen/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/datagen/package-info.java)
 - [src/main/java/com/example/terradiver/drilling/BlockClearer.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/BlockClearer.java)
+- [src/main/java/com/example/terradiver/drilling/DrillMode.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillMode.java)
+- [src/main/java/com/example/terradiver/drilling/DrillModeDetector.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillModeDetector.java)
 - [src/main/java/com/example/terradiver/drilling/DrillingRate.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillingRate.java)
 - [src/main/java/com/example/terradiver/drilling/DrillingUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillingUtils.java)
 - [src/main/java/com/example/terradiver/item/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/item/package-info.java)
 - [src/main/java/com/example/terradiver/navigation/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/navigation/package-info.java)
 - [src/main/java/com/example/terradiver/physics/AmbientSignal.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/AmbientSignal.java)
 - [src/main/java/com/example/terradiver/physics/CrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownBlock.java)
-- [src/main/java/com/example/terradiver/physics/DrillMode.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillMode.java)
-- [src/main/java/com/example/terradiver/physics/DrillModeDetector.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillModeDetector.java)
 - [src/main/java/com/example/terradiver/physics/IBearingSpeedProvider.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/IBearingSpeedProvider.java)
 - [src/main/java/com/example/terradiver/physics/PhysicsUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/PhysicsUtils.java)
 - [src/main/java/com/example/terradiver/physics/ResistanceField.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/ResistanceField.java)
@@ -34,11 +34,11 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/registry/CreativeTabs.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/registry/CreativeTabs.java)
 - [src/main/java/com/example/terradiver/registry/ItemRegistry.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/registry/ItemRegistry.java)
 - [src/test/java/com/example/terradiver/drilling/BlockClearerTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/drilling/BlockClearerTest.java)
+- [src/test/java/com/example/terradiver/drilling/DrillModeDetectorTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/drilling/DrillModeDetectorTest.java)
 - [src/test/java/com/example/terradiver/drilling/DrillingRateTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/drilling/DrillingRateTest.java)
 - [src/test/java/com/example/terradiver/drilling/DrillingUtilsTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/drilling/DrillingUtilsTest.java)
 - [src/test/java/com/example/terradiver/physics/AmbientSignalTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/AmbientSignalTest.java)
 - [src/test/java/com/example/terradiver/physics/CrownBlockTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/CrownBlockTest.java)
-- [src/test/java/com/example/terradiver/physics/DrillModeDetectorTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/DrillModeDetectorTest.java)
 - [src/test/java/com/example/terradiver/physics/PhysicsUtilsTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/PhysicsUtilsTest.java)
 - [src/test/java/com/example/terradiver/physics/ResistanceFieldTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/ResistanceFieldTest.java)
 - [src/test/java/com/example/terradiver/physics/RollLockTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/RollLockTest.java)
