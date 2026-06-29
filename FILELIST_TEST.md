@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-06-27 19:13 UTC_
+_Обновлён: 2026-06-29 06:48 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -20,10 +20,18 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/navigation/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/navigation/package-info.java)
 - [src/main/java/com/example/terradiver/physics/AmbientSignal.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/AmbientSignal.java)
 - [src/main/java/com/example/terradiver/physics/CrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownBlock.java)
+- [src/main/java/com/example/terradiver/physics/DrillCrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownBlock.java)
+- [src/main/java/com/example/terradiver/physics/DrillCrownItem.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownItem.java)
+- [src/main/java/com/example/terradiver/physics/DrillCrownMultiblock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownMultiblock.java)
+- [src/main/java/com/example/terradiver/physics/DrillCrownPartBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownPartBlock.java)
+- [src/main/java/com/example/terradiver/physics/DrillCrownPartBlockEntity.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownPartBlockEntity.java)
+- [src/main/java/com/example/terradiver/physics/DrillCrownStructure.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownStructure.java)
+- [src/main/java/com/example/terradiver/physics/DriveContextAdapter.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DriveContextAdapter.java)
 - [src/main/java/com/example/terradiver/physics/IBearingSpeedProvider.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/IBearingSpeedProvider.java)
 - [src/main/java/com/example/terradiver/physics/PhysicsUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/PhysicsUtils.java)
 - [src/main/java/com/example/terradiver/physics/ResistanceField.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/ResistanceField.java)
 - [src/main/java/com/example/terradiver/physics/RollLock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/RollLock.java)
+- [src/main/java/com/example/terradiver/physics/TickCycle.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/TickCycle.java)
 - [src/main/java/com/example/terradiver/physics/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/package-info.java)
 - [src/main/java/com/example/terradiver/pressure/GirderLine.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/pressure/GirderLine.java)
 - [src/main/java/com/example/terradiver/pressure/HullCache.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/pressure/HullCache.java)
@@ -39,9 +47,11 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/test/java/com/example/terradiver/drilling/DrillingUtilsTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/drilling/DrillingUtilsTest.java)
 - [src/test/java/com/example/terradiver/physics/AmbientSignalTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/AmbientSignalTest.java)
 - [src/test/java/com/example/terradiver/physics/CrownBlockTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/CrownBlockTest.java)
+- [src/test/java/com/example/terradiver/physics/DrillCrownStructureTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/DrillCrownStructureTest.java)
 - [src/test/java/com/example/terradiver/physics/PhysicsUtilsTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/PhysicsUtilsTest.java)
 - [src/test/java/com/example/terradiver/physics/ResistanceFieldTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/ResistanceFieldTest.java)
 - [src/test/java/com/example/terradiver/physics/RollLockTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/RollLockTest.java)
+- [src/test/java/com/example/terradiver/physics/TickCycleTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/physics/TickCycleTest.java)
 - [src/test/java/com/example/terradiver/pressure/HullCacheTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/pressure/HullCacheTest.java)
 - [src/test/java/com/example/terradiver/pressure/PressureCompensationTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/pressure/PressureCompensationTest.java)
 - [src/test/java/com/example/terradiver/pressure/PressureUtilsTest.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/test/java/com/example/terradiver/pressure/PressureUtilsTest.java)
