@@ -1,0 +1,30 @@
+{
+  "variants": {
+    "facing=up": {
+      "model": "terra_diver:block/drill_1x1"
+    },
+    "facing=down": {
+      "model": "terra_diver:block/drill_1x1",
+      "x": 180
+    },
+    "facing=north": {
+      "model": "terra_diver:block/drill_1x1",
+      "x": 90
+    },
+    "facing=south": {
+      "model": "terra_diver:block/drill_1x1",
+      "x": 90,
+      "y": 180
+    },
+    "facing=east": {
+      "model": "terra_diver:block/drill_1x1",
+      "x": 90,
+      "y": 90
+    },
+    "facing=west": {
+      "model": "terra_diver:block/drill_1x1",
+      "x": 90,
+      "y": 270
+    }
+  }
+}

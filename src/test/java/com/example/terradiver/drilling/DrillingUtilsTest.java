@@ -4,8 +4,6 @@ import com.example.terradiver.physics.PhysicsUtils;
 import com.example.terradiver.physics.CrownBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -14,7 +12,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /*
  * Юнит-тесты буровой системы (TD_02): чистые функции + оркестрация инвентаря через сёму.
@@ -76,31 +73,22 @@ class DrillingUtilsTest {
     // ── is_bedrock_blocking ──────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("is_bedrock_blocking")
+    @DisplayName("is_bedrock_blocking — ядро (float[])")
     class Bedrock {
-
-        private PhysicsUtils.BlockStateAtPos at(float hardness) {
-            Block block = mock(Block.class);
-            when(block.defaultDestroyTime()).thenReturn(hardness);
-            BlockState state = mock(BlockState.class);
-            when(state.getBlock()).thenReturn(block);
-            return new PhysicsUtils.BlockStateAtPos(BlockPos.ZERO, state);
-        }
-
         @Test @DisplayName("пробиваемые блоки → False")
         void allBreakable() {
-            assertFalse(DrillingUtils.is_bedrock_blocking(List.of(at(1.5f), at(3.0f))));
+            assertFalse(DrillingUtils.is_bedrock_blocking_core(new float[]{1.5f, 3.0f}));
         }
 
         @Test @DisplayName("есть непробиваемый (hardness<0) → True")
         void hasBedrock() {
-            assertTrue(DrillingUtils.is_bedrock_blocking(List.of(at(1.5f), at(-1.0f))));
+            assertTrue(DrillingUtils.is_bedrock_blocking_core(new float[]{1.5f, -1.0f}));
         }
 
-        @Test @DisplayName("пустой/null список → False")
+        @Test @DisplayName("пустой/null массив → False")
         void empty() {
-            assertFalse(DrillingUtils.is_bedrock_blocking(List.of()));
-            assertFalse(DrillingUtils.is_bedrock_blocking(null));
+            assertFalse(DrillingUtils.is_bedrock_blocking_core(new float[]{}));
+            assertFalse(DrillingUtils.is_bedrock_blocking_core(null));
         }
     }
 
@@ -143,50 +131,26 @@ class DrillingUtilsTest {
     // ── deposit_to_inventory (оркестрация; стекинг делегирован сёме) ──────────
 
     @Nested
-    @DisplayName("deposit_to_inventory — оркестрация")
+    @DisplayName("deposit_to_inventory — оркестрация (ядро)")
     class Deposit {
-
-        private ItemStack stack(boolean empty) {
-            ItemStack s = mock(ItemStack.class);
-            when(s.isEmpty()).thenReturn(empty);
-            return s;
-        }
-
         @Test @DisplayName("весь дроп влез → True")
         void allFit() {
-            DrillingUtils.CrownBuffer buf = mock(DrillingUtils.CrownBuffer.class);
-            when(buf.insert(any())).thenReturn(stack(true)); // остаток пуст
-            List<ItemStack> drops = List.of(stack(false), stack(false));
-            assertTrue(DrillingUtils.deposit_to_inventory(drops, buf));
+            assertTrue(DrillingUtils.deposit_core(2, i -> false, i -> true));
         }
 
-        @Test @DisplayName("переполнение в середине → False")
+        @Test @DisplayName("переполнение в середине (индекс 1 не влез) → False")
         void overflowMidway() {
-            DrillingUtils.CrownBuffer buf = mock(DrillingUtils.CrownBuffer.class);
-            when(buf.insert(any())).thenReturn(stack(true), stack(false)); // 2-й не влез целиком
-            List<ItemStack> drops = List.of(stack(false), stack(false), stack(false));
-            assertFalse(DrillingUtils.deposit_to_inventory(drops, buf));
+            assertFalse(DrillingUtils.deposit_core(3, i -> false, i -> i != 1));
         }
 
-        @Test @DisplayName("пустой список дропа → True")
+        @Test @DisplayName("пустой список дропа → True (insert не зовётся)")
         void emptyDrops() {
-            DrillingUtils.CrownBuffer buf = mock(DrillingUtils.CrownBuffer.class);
-            assertTrue(DrillingUtils.deposit_to_inventory(List.of(), buf));
-            verifyNoInteractions(buf);
+            assertTrue(DrillingUtils.deposit_core(0, i -> false, i -> { throw new AssertionError("insert при пустом списке"); }));
         }
 
         @Test @DisplayName("пустые стаки пропускаются, не вставляются")
         void skipsEmptyStacks() {
-            DrillingUtils.CrownBuffer buf = mock(DrillingUtils.CrownBuffer.class);
-            List<ItemStack> drops = new ArrayList<>();
-            drops.add(stack(true)); // пустой — пропустить
-            assertTrue(DrillingUtils.deposit_to_inventory(drops, buf));
-            verify(buf, never()).insert(any());
-        }
-
-        @Test @DisplayName("null буфер → False")
-        void nullBuffer() {
-            assertFalse(DrillingUtils.deposit_to_inventory(List.of(stack(false)), null));
+            assertTrue(DrillingUtils.deposit_core(3, i -> true, i -> { throw new AssertionError("insert пустого стака"); }));
         }
     }
 

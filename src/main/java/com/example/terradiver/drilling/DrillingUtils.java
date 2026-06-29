@@ -8,6 +8,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntPredicate;
 
 /*
  * Чистые функции буровой системы (TD_02). Спецификация — TD_06, TD_02.
@@ -56,9 +57,21 @@ public final class DrillingUtils {
         if (blocksAhead == null || blocksAhead.isEmpty()) {
             return false;
         }
-        for (PhysicsUtils.BlockStateAtPos b : blocksAhead) {
-            BlockState s = b.state();
-            if (s != null && s.getBlock().defaultDestroyTime() < 0f) {
+        float[] hardnesses = new float[blocksAhead.size()];
+        for (int i = 0; i < blocksAhead.size(); i++) {
+            BlockState s = blocksAhead.get(i).state();
+            hardnesses[i] = (s == null) ? 0f : s.getBlock().defaultDestroyTime();
+        }
+        return is_bedrock_blocking_core(hardnesses);
+    }
+
+    // Чистое ядро: есть ли непробиваемый (hardness<0). Тестируется без Minecraft на float[].
+    public static boolean is_bedrock_blocking_core(float[] hardnesses) {
+        if (hardnesses == null) {
+            return false;
+        }
+        for (float h : hardnesses) {
+            if (h < 0f) {
                 return true; // ранний выход на первом непробиваемом
             }
         }
@@ -152,12 +165,22 @@ public final class DrillingUtils {
         if (buffer == null) {
             return false;
         }
-        for (ItemStack stack : drops) {
-            if (stack == null || stack.isEmpty()) {
+        return deposit_core(drops.size(),
+            i -> { ItemStack s = drops.get(i); return s == null || s.isEmpty(); },
+            i -> { ItemStack leftover = buffer.insert(drops.get(i)); return leftover == null || leftover.isEmpty(); });
+    }
+
+    /*
+     * Чистое ядро оркестрации: пропустить пустые (isEmpty), на первом непоместившемся (inserted==false)
+     * вернуть false, иначе true. ItemStack/буфер абстрагированы предикатами по индексу — тестируется
+     * без Minecraft. См. TD_06, deposit_to_inventory.
+     */
+    public static boolean deposit_core(int count, IntPredicate isEmpty, IntPredicate inserted) {
+        for (int i = 0; i < count; i++) {
+            if (isEmpty.test(i)) {
                 continue;
             }
-            ItemStack leftover = buffer.insert(stack);
-            if (leftover != null && !leftover.isEmpty()) {
+            if (!inserted.test(i)) {
                 return false; // место кончилось в середине
             }
         }

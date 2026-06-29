@@ -1,6 +1,7 @@
 package com.example.terradiver.config;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
+import com.example.terradiver.physics.TickCycle;
 
 public class ModConfig {
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
@@ -178,5 +179,21 @@ public class ModConfig {
         BUILDER.pop();
 
         SPEC = BUILDER.build();
+    }
+    /*
+     * Фабрика констант тик-цикла из значений конфига. Зовётся, когда конфиг загружен (не в static-блоке).
+     * Кэшировать на стороне BlockEntity, не пересобирать каждый тик.
+     */
+    public static TickCycle.Constants tickConstants() {
+        return new TickCycle.Constants(
+            DIVE_TRIGGER_SPEED.get().floatValue(), DIVE_HOLD_SPEED.get().floatValue(),
+            MIN_BLOCKS_PER_TICK.get(),
+            PENDING_GROWTH.get().floatValue(), PENDING_DECAY.get().floatValue(), PENDING_MAX.get().floatValue(),
+            MAX_COMPENSATION.get().floatValue(),
+            MIN_HARDNESS.get().floatValue(), RATE_MAX.get().floatValue(), PENDING_RESISTANCE_FACTOR.get().floatValue(),
+            PUSHBACK_THRESHOLD.get().floatValue(), PUSHBACK_FACTOR.get().floatValue(),
+            SOUND_DAMPING.get().floatValue(),
+            (float) DEEPSLATE_Y.get().intValue(), (float) BEDROCK_Y.get().intValue(),
+            PRESSURE_CURVE_K.get().floatValue(), PRESSURE_SCALE.get().floatValue());
     }
 }
