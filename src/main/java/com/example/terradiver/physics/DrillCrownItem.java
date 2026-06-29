@@ -32,8 +32,15 @@ public class DrillCrownItem extends BlockItem {
             return InteractionResult.FAIL;
         }
         Level level = context.getLevel();
+        // Направление = грань поверхности, на которую ставим (бур смотрит ОТ поверхности).
+        // Shift инвертирует направление и сдвигает структуру наружу, чтобы она не ушла в поверхность.
+        Direction face = context.getClickedFace();
+        boolean inverted = context.isSecondaryUseActive();
+        Direction facing = inverted ? face.getOpposite() : face;
         BlockPos masterPos = context.getClickedPos();
-        Direction facing = context.getNearestLookingDirection(); // направление бурения
+        if (inverted) {
+            masterPos = masterPos.relative(face, DrillCrownStructure.depthLayers(master.crownSize()) - 1);
+        }
 
         List<BlockPos> cells = DrillCrownStructure.worldCells(master.crownSize(), facing, masterPos);
 

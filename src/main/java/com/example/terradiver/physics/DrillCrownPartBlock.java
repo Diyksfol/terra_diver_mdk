@@ -7,6 +7,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -38,6 +39,16 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new DrillCrownPartBlockEntity(pos, state);
+    }
+
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        // Сломали часть в выживании → выронить один предмет короны у мастера.
+        if (!level.isClientSide && !player.getAbilities().instabuild
+                && level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
+            DrillCrownMultiblock.dropCrownItem(level, be.getMaster());
+        }
+        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override

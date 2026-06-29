@@ -23,6 +23,7 @@
   "block.terra_diver.drill_crown_11x11_iron": "Железная буровая корона 11×11",
   "block.terra_diver.drill_crown_11x11_brass": "Латунная буровая корона 11×11",
   "block.terra_diver.drill_crown_11x11_netherite": "Незеритовая буровая корона 11×11",
+  "block.terra_diver.drill_crown_part": "Сегмент буровой короны",
   "block.terra_diver.crown_bearing_andesite": "Андезитовый буровой подшипник",
   "block.terra_diver.crown_bearing_sturdy": "Прочный буровой подшипник",
   "block.terra_diver.pressure_gauge": "Манометр давления",

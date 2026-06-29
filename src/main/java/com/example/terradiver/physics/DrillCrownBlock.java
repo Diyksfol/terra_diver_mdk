@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -27,9 +28,9 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
 
     // Спецформа острия 1x1 (модельная ориентация, глубина +Y): низ полный + центр-полублок сверху.
-    private static final VoxelShape TIP_BASE = Shapes.or(
-        Shapes.box(0.0, 0.0, 0.0, 1.0, 0.5, 1.0),
-        Shapes.box(0.25, 0.5, 0.25, 0.75, 1.0, 0.75));
+    // Острие 1x1: один куб 8x8x8 пикселей по центру в нижней части блока — полностью внутри текстуры.
+    private static final VoxelShape TIP_BASE =
+        Shapes.box(0.25, 0.0, 0.25, 0.75, 0.5, 0.75);
 
     private final String size;
     private final Map<Direction, VoxelShape> shapes;
@@ -53,8 +54,18 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        // Бур смотрит туда, куда целится игрок (направление бурения). Тонкая настройка — в игре.
-        return defaultBlockState().setValue(FACING, context.getNearestLookingDirection());
+        Direction face = context.getClickedFace();
+        Direction facing = context.isSecondaryUseActive() ? face.getOpposite() : face;
+        return defaultBlockState().setValue(FACING, facing);
+    }
+
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        // Сломали мастера в выживании → выронить один предмет короны (структура снесётся в onRemove).
+        if (!level.isClientSide && !player.getAbilities().instabuild) {
+            DrillCrownMultiblock.dropCrownItem(level, pos);
+        }
+        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override

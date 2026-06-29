@@ -1,28 +1,28 @@
 {
   "variants": {
     "facing=up": {
-      "model": "terra_diver:block/drill_5x5"
+      "model": "terra_diver:block/drill_5x5_netherite"
     },
     "facing=down": {
-      "model": "terra_diver:block/drill_5x5",
+      "model": "terra_diver:block/drill_5x5_netherite",
       "x": 180
     },
     "facing=north": {
-      "model": "terra_diver:block/drill_5x5",
+      "model": "terra_diver:block/drill_5x5_netherite",
       "x": 90
     },
     "facing=south": {
-      "model": "terra_diver:block/drill_5x5",
+      "model": "terra_diver:block/drill_5x5_netherite",
       "x": 90,
       "y": 180
     },
     "facing=east": {
-      "model": "terra_diver:block/drill_5x5",
+      "model": "terra_diver:block/drill_5x5_netherite",
       "x": 90,
       "y": 90
     },
     "facing=west": {
-      "model": "terra_diver:block/drill_5x5",
+      "model": "terra_diver:block/drill_5x5_netherite",
       "x": 90,
       "y": 270
     }

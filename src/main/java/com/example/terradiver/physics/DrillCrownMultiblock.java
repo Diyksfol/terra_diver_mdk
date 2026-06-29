@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
@@ -52,6 +53,14 @@ public final class DrillCrownMultiblock {
             }
         } finally {
             DISSOLVING.set(Boolean.FALSE);
+        }
+    }
+
+    /* Выронить один предмет короны у мастера (предмет = тот же блок-мастер: размер+материал). */
+    public static void dropCrownItem(Level level, BlockPos masterPos) {
+        BlockState ms = level.getBlockState(masterPos);
+        if (ms.getBlock() instanceof Master) {
+            Block.popResource(level, masterPos, new ItemStack(ms.getBlock()));
         }
     }
 
