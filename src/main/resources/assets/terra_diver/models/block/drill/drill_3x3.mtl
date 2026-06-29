@@ -1,0 +1,7 @@
+newmtl body
+map_Kd #body
+Kd 1.000000 1.000000 1.000000
+
+newmtl cutter
+map_Kd #cutter
+Kd 1.000000 1.000000 1.000000

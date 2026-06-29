@@ -1,0 +1,30 @@
+{
+  "replace": false,
+  "values": [
+    "terra_diver:drill_crown_1x1_copper",
+    "terra_diver:drill_crown_1x1_iron",
+    "terra_diver:drill_crown_1x1_brass",
+    "terra_diver:drill_crown_1x1_netherite",
+    "terra_diver:drill_crown_3x3_copper",
+    "terra_diver:drill_crown_3x3_iron",
+    "terra_diver:drill_crown_3x3_brass",
+    "terra_diver:drill_crown_3x3_netherite",
+    "terra_diver:drill_crown_5x5_copper",
+    "terra_diver:drill_crown_5x5_iron",
+    "terra_diver:drill_crown_5x5_brass",
+    "terra_diver:drill_crown_5x5_netherite",
+    "terra_diver:drill_crown_7x7_copper",
+    "terra_diver:drill_crown_7x7_iron",
+    "terra_diver:drill_crown_7x7_brass",
+    "terra_diver:drill_crown_7x7_netherite",
+    "terra_diver:drill_crown_9x9_copper",
+    "terra_diver:drill_crown_9x9_iron",
+    "terra_diver:drill_crown_9x9_brass",
+    "terra_diver:drill_crown_9x9_netherite",
+    "terra_diver:drill_crown_11x11_copper",
+    "terra_diver:drill_crown_11x11_iron",
+    "terra_diver:drill_crown_11x11_brass",
+    "terra_diver:drill_crown_11x11_netherite",
+    "terra_diver:drill_crown_part"
+  ]
+}
