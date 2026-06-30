@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-06-29 17:56 UTC_
+_Обновлён: 2026-06-30 07:01 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -7,6 +7,8 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/block/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/block/package-info.java)
 - [src/main/java/com/example/terradiver/blockentity/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/blockentity/package-info.java)
 - [src/main/java/com/example/terradiver/client/ClientEvents.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/ClientEvents.java)
+- [src/main/java/com/example/terradiver/client/DrillClientExtensions.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/DrillClientExtensions.java)
+- [src/main/java/com/example/terradiver/client/TerraDiverArmPoses.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/TerraDiverArmPoses.java)
 - [src/main/java/com/example/terradiver/client/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/package-info.java)
 - [src/main/java/com/example/terradiver/config/ModConfig.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/config/ModConfig.java)
 - [src/main/java/com/example/terradiver/config/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/config/package-info.java)
@@ -17,9 +19,11 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/drilling/DrillingRate.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillingRate.java)
 - [src/main/java/com/example/terradiver/drilling/DrillingUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillingUtils.java)
 - [src/main/java/com/example/terradiver/item/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/item/package-info.java)
+- [src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java)
 - [src/main/java/com/example/terradiver/navigation/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/navigation/package-info.java)
 - [src/main/java/com/example/terradiver/physics/AmbientSignal.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/AmbientSignal.java)
 - [src/main/java/com/example/terradiver/physics/CrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownBlock.java)
+- [src/main/java/com/example/terradiver/physics/CrownShapes.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownShapes.java)
 - [src/main/java/com/example/terradiver/physics/DrillCrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownBlock.java)
 - [src/main/java/com/example/terradiver/physics/DrillCrownItem.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownItem.java)
 - [src/main/java/com/example/terradiver/physics/DrillCrownMultiblock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownMultiblock.java)
