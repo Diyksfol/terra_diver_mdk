@@ -1,5 +1,5 @@
 # neoforge.mods.toml - metadata for Create: Terra Diver
-# ${...} placeholders are substituted from gradle.properties at build time.
+# Placeholders such as mod_id and mod_version come from gradle.properties at build time.
 # Keep this file ASCII: processResources runs it through a Groovy template engine,
 # and non-UTF-8 reading of accented/Cyrillic text can break the build.
 
@@ -17,6 +17,9 @@ version="${mod_version}" #mandatory
 displayName="${mod_name}" #mandatory
 authors="Diyksfol"
 enumExtensions="META-INF/enumextensions.json"
+
+[[mixins]]
+config="terra_diver.mixins.json"
 credits="Built on the Create framework. Thanks to the Create, Sable, Aeronautics and Offroad teams."
 #logoFile="terra_diver.png" #optional - put a logo in the JAR root and uncomment
 description='''

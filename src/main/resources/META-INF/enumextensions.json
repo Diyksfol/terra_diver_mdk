@@ -4,7 +4,10 @@
       "enum": "net/minecraft/client/model/HumanoidModel$ArmPose",
       "name": "TERRA_DIVER_DRILL_LIFT",
       "constructor": "(ZLnet/neoforged/neoforge/client/IArmPoseTransformer;)V",
-      "parameters": "com.example.terradiver.client.TerraDiverArmPoses#DRILL_LIFT"
+      "parameters": {
+        "class": "com/example/terradiver/client/TerraDiverArmPoses",
+        "field": "DRILL_LIFT"
+      }
     }
   ]
 }
