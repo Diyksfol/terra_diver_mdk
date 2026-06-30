@@ -1,5 +1,6 @@
 package com.example.terradiver.client;
 
+import com.example.terradiver.physics.DrillCrownBlock;
 import com.example.terradiver.physics.DrillCrownItem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -7,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -20,30 +22,54 @@ import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsE
 import net.neoforged.neoforge.client.event.RenderPlayerEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 
+
 /*
- * Клиентский рендер буровой короны в руках:
- *  - поза: обе руки игрока подняты вверх (кастомная ArmPose, см. TerraDiverArmPoses + enumextensions.json);
- *  - модель: гигантский бур рисуется над головой параллельно земле (в руке он спрятан thirdperson-трансформом).
- * Значения положения/масштаба помечены TUNE — подстраиваются в игре.
- *
- * Один @EventBusSubscriber обслуживает оба события: RenderPlayerEvent (игровая шина) и
- * RegisterClientExtensionsEvent (мод-шина) — в NeoForge 1.21.1 шина определяется по типу события автоматически.
+ * Клиентский рендер буровой короны в руках.
+ *  - Поза: обе руки строго вверх (кастомная ArmPose, см. TerraDiverArmPoses + enumextensions.json).
+ *  - Модель: бур рисуется над головой, по центру между руками, поворачивается вслед за игроком.
+ *  - 1x1 исключён: держится как обычный блок (без позы и без над-головой рендера).
+ * Значения положения/масштаба помечены TUNE.
  */
 @EventBusSubscriber(modid = "terra_diver", value = Dist.CLIENT)
 public class DrillClientExtensions {
 
-    // Кэш кастомной позы. valueOf безопасен после расширения enum при его загрузке классов.
+    // Равное уменьшение в 2 раза от исходного для всех размеров (3x3 тоньше 11x11 — как и должно).
+    private static final float SCALE = 0.5F; // - TUNE
+
+    // Размер короны для предмета, либо null если это не корона.
+    private static String crownSize(ItemStack stack) {
+        if (stack.getItem() instanceof DrillCrownItem item
+                && item.getBlock() instanceof DrillCrownBlock block) {
+            return block.crownSize();
+        }
+        return null;
+    }
+
+    // Корона в основной руке, исключая 1x1 (тот держится как обычный блок).
+    private static ItemStack liftedDrill(Player player) {
+        ItemStack main = player.getMainHandItem();
+        String size = crownSize(main);
+        if (size != null && !"1x1".equals(size)) {
+            return main;
+        }
+        return ItemStack.EMPTY;
+    }
+
     private static HumanoidModel.ArmPose drillLiftPose() {
         return HumanoidModel.ArmPose.valueOf("TERRA_DIVER_DRILL_LIFT");
     }
 
-    // Регистрация позы рук для всех предметов короны.
+    // Поза рук — только для корон крупнее 1x1.
     @SubscribeEvent
     static void onRegisterClientExtensions(RegisterClientExtensionsEvent event) {
         IClientItemExtensions ext = new IClientItemExtensions() {
             @Override
             public HumanoidModel.ArmPose getArmPose(LivingEntity entity, InteractionHand hand, ItemStack stack) {
-                return drillLiftPose();
+                String size = crownSize(stack);
+                if (size != null && !"1x1".equals(size)) {
+                    return drillLiftPose();
+                }
+                return null;
             }
         };
         for (Item item : BuiltInRegistries.ITEM) {
@@ -53,25 +79,23 @@ public class DrillClientExtensions {
         }
     }
 
-    // Рендер модели бура над головой, пока игрок держит корону.
+    // Рендер бура над головой.
     @SubscribeEvent
     static void onRenderPlayerPost(RenderPlayerEvent.Post event) {
         Player player = event.getEntity();
-        ItemStack stack = player.getMainHandItem();
-        if (!(stack.getItem() instanceof DrillCrownItem)) {
-            stack = player.getOffhandItem();
-            if (!(stack.getItem() instanceof DrillCrownItem)) {
-                return;
-            }
+        ItemStack stack = liftedDrill(player);
+        if (stack.isEmpty()) {
+            return;
         }
-
         PoseStack pose = event.getPoseStack();
         pose.pushPose();
-        pose.translate(0.0D, player.getBbHeight() + 0.5D, 0.0D); // над головой - TUNE
-        pose.mulPose(Axis.XP.rotationDegrees(90.0F));            // параллельно земле - TUNE
-        float s = 0.35F;                                          // масштаб - TUNE
-        pose.scale(s, s, s);
-        pose.translate(-0.5D, 0.0D, -0.5D);                       // грубое центрирование - TUNE
+
+        float bodyYaw = Mth.lerp(event.getPartialTick(), player.yBodyRotO, player.yBodyRot);
+        pose.translate(0.0D, player.getBbHeight() + 0.4D, 0.0D);  // над головой - TUNE
+        pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));  // поворот вслед за игроком
+        // без наклона: ось бура +Y смотрит вверх, диск смотрит вверх, мастер (Y=0) снизу у рук
+        pose.scale(SCALE, SCALE, SCALE);
+        pose.translate(-0.5D, 0.0D, -0.5D);                       // центр по XZ, мастер у рук - TUNE Y
 
         Minecraft mc = Minecraft.getInstance();
         mc.getItemRenderer().renderStatic(

@@ -1,27 +1,19 @@
 # neoforge.mods.toml - metadata for Create: Terra Diver
 # Placeholders such as mod_id and mod_version come from gradle.properties at build time.
-# Keep this file ASCII: processResources runs it through a Groovy template engine,
-# and non-UTF-8 reading of accented/Cyrillic text can break the build.
+# Keep this file ASCII: processResources runs it through a Groovy template engine.
 
 modLoader="javafml" #mandatory
 loaderVersion="${loader_version_range}" #mandatory
-
-# Mod license (SPDX identifier).
 license="LGPL-2.1-only"
-
 issueTrackerURL="https://github.com/Diyksfol/terra_diver_mdk/issues"
 
 [[mods]] #mandatory
 modId="${mod_id}" #mandatory
 version="${mod_version}" #mandatory
-displayName="${mod_name}" #mandatory
+displayName="Create: Terra Diver" #mandatory
 authors="Diyksfol"
-enumExtensions="META-INF/enumextensions.json"
-
-[[mixins]]
-config="terra_diver.mixins.json"
 credits="Built on the Create framework. Thanks to the Create, Sable, Aeronautics and Offroad teams."
-#logoFile="terra_diver.png" #optional - put a logo in the JAR root and uncomment
+enumExtensions="META-INF/enumextensions.json"
 description='''
 Create: Terra Diver brings drilling contraptions underground.
 
@@ -30,7 +22,9 @@ Build directional multiblock drill crowns - copper, iron, brass and netherite, i
 An addon to Create. The sky belongs to Aeronautics, the seas to Deep Seas - the depths are yours.
 '''
 
-# --- Dependencies ---
+[[mixins]]
+config="terra_diver.mixins.json"
+
 [[dependencies.${mod_id}]] #optional
     modId="neoforge" #mandatory
     type="required" #mandatory

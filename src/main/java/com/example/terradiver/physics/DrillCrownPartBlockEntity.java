@@ -5,6 +5,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -42,6 +46,10 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
         this.facing = facing;
         this.cachedShape = null;
         setChanged();
+        if (level != null && !level.isClientSide) {
+            // Синхронизировать форму на клиент: контур и клиентская коллизия зовут getShape на клиенте.
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
     }
 
     public BlockPos getMaster() {
@@ -54,6 +62,29 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
                 DrillCrownStructure.cellShapeBoxes(size, ox, oy, oz), facing);
         }
         return cachedShape;
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        CompoundTag tag = super.getUpdateTag(registries);
+        saveAdditional(tag, registries); // включить size/смещение/facing в пакет чанка
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this); // присылает getUpdateTag клиенту
+    }
+
+    @Override
+    public void onDataPacket(net.minecraft.network.Connection connection,
+                             ClientboundBlockEntityDataPacket packet, HolderLookup.Provider registries) {
+        // Дефолтный onDataPacket пустой — без этого данные формы/мастера не применяются на клиенте.
+        CompoundTag tag = packet.getTag();
+        if (tag != null) {
+            loadAdditional(tag, registries);
+        }
+        cachedShape = null; // пересобрать форму с новыми данными
     }
 
     @Override

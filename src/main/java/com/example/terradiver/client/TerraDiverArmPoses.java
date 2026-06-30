@@ -17,11 +17,11 @@ public class TerraDiverArmPoses {
         false, // useItem
         (IArmPoseTransformer) (model, entity, arm) -> {
             // Поднять обе руки почти вертикально вверх. Значения подстраиваются в игре.
-            model.rightArm.xRot = -2.7F;
-            model.leftArm.xRot = -2.7F;
+            model.rightArm.xRot = -3.05F; // почти строго вверх
+            model.leftArm.xRot = -3.05F;
             model.rightArm.yRot = 0.0F;
             model.leftArm.yRot = 0.0F;
-            model.rightArm.zRot = 0.1F;
-            model.leftArm.zRot = -0.1F;
+            model.rightArm.zRot = 0.05F;
+            model.leftArm.zRot = -0.05F;
         });
 }
