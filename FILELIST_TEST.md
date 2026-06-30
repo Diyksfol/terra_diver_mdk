@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-06-30 07:01 UTC_
+_Обновлён: 2026-06-30 12:02 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -8,6 +8,7 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/blockentity/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/blockentity/package-info.java)
 - [src/main/java/com/example/terradiver/client/ClientEvents.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/ClientEvents.java)
 - [src/main/java/com/example/terradiver/client/DrillClientExtensions.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/DrillClientExtensions.java)
+- [src/main/java/com/example/terradiver/client/DrillOffhandLock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/DrillOffhandLock.java)
 - [src/main/java/com/example/terradiver/client/TerraDiverArmPoses.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/TerraDiverArmPoses.java)
 - [src/main/java/com/example/terradiver/client/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/package-info.java)
 - [src/main/java/com/example/terradiver/config/ModConfig.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/config/ModConfig.java)
