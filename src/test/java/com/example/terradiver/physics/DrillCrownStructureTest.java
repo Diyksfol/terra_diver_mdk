@@ -20,9 +20,9 @@ class DrillCrownStructureTest {
     @Test @DisplayName("число ячеек тела по размерам")
     void cellCounts() {
         assertEquals(1, DrillCrownStructure.cells("1x1").length);
-        assertEquals(6, DrillCrownStructure.cells("3x3").length);
-        assertEquals(22, DrillCrownStructure.cells("5x5").length);
-        assertEquals(158, DrillCrownStructure.cells("11x11").length);
+        assertEquals(18, DrillCrownStructure.cells("3x3").length);
+        assertEquals(56, DrillCrownStructure.cells("5x5").length);
+        assertEquals(235, DrillCrownStructure.cells("11x11").length);
     }
 
     @Test @DisplayName("неизвестный размер → исключение")
@@ -55,7 +55,7 @@ class DrillCrownStructureTest {
                 assertTrue(seen.add(r[0] + "," + r[1] + "," + r[2]),
                     "коллизия ячеек при " + f);
             }
-            assertEquals(158, seen.size());
+            assertEquals(235, seen.size());
         }
     }
 
@@ -63,7 +63,7 @@ class DrillCrownStructureTest {
     void masterIsFirst() {
         BlockPos master = new BlockPos(10, 64, -5);
         List<BlockPos> cells = DrillCrownStructure.worldCells("3x3", Direction.UP, master);
-        assertEquals(6, cells.size());
+        assertEquals(18, cells.size());
         assertTrue(cells.contains(master), "мастер входит в структуру");
         // смещение (0,0,0) присутствует → сам master в списке
     }

@@ -35,6 +35,9 @@ public class DrillClientExtensions {
 
     // Равное уменьшение в 2 раза от исходного для всех размеров (3x3 тоньше 11x11 — как и должно).
     private static final float SCALE = 0.5F; // - TUNE
+    // Сдвиг вдоль линии плеч к центру. Модель центрирована в 0.5; бур был у левой руки,
+    // поэтому добавляем половину ширины плеч. Если уехало не туда — поменяй знак 0.7 на -0.7.
+    private static final double CENTER_X = -0.5D + 0.35D; // - TUNE
 
     // Размер короны для предмета, либо null если это не корона.
     private static String crownSize(ItemStack stack) {
@@ -95,7 +98,7 @@ public class DrillClientExtensions {
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));  // поворот вслед за игроком
         // без наклона: ось бура +Y смотрит вверх, диск смотрит вверх, мастер (Y=0) снизу у рук
         pose.scale(SCALE, SCALE, SCALE);
-        pose.translate(-0.5D, 0.0D, -0.5D);                       // центр по XZ, мастер у рук - TUNE Y
+        pose.translate(CENTER_X, 0.0D, -0.5D);                    // центр: CENTER_X вдоль линии плеч - TUNE
 
         Minecraft mc = Minecraft.getInstance();
         mc.getItemRenderer().renderStatic(
