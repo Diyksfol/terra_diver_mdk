@@ -12,7 +12,6 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 import java.util.EnumMap;
@@ -28,9 +27,9 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
 
     // Спецформа острия 1x1 (модельная ориентация, глубина +Y): низ полный + центр-полублок сверху.
-    // Острие 1x1: один куб 8x8x8 пикселей по центру в нижней части блока — полностью внутри текстуры.
-    private static final VoxelShape TIP_BASE =
-        Shapes.box(0.25, 0.0, 0.25, 0.75, 0.5, 0.75);
+    // Острие 1x1: один куб 8x8x8 px по центру в нижней части блока (модельная ориентация).
+    private static final double[][] TIP_BASE = {{0.25, 0.0, 0.25, 0.75, 0.5, 0.75}};
+    private static final double[][] FULL_CUBE = {{0.0, 0.0, 0.0, 1.0, 1.0, 1.0}};
 
     private final String size;
     private final Map<Direction, VoxelShape> shapes;
@@ -38,10 +37,10 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     public DrillCrownBlock(Properties properties, String size) {
         super(properties);
         this.size = size;
-        VoxelShape base = "1x1".equals(size) ? TIP_BASE : Shapes.block(); // NxN-ячейка — полный куб
+        double[][] base = "1x1".equals(size) ? TIP_BASE : FULL_CUBE; // NxN мастер-ячейка — полный куб
         EnumMap<Direction, VoxelShape> m = new EnumMap<>(Direction.class);
         for (Direction d : Direction.values()) {
-            m.put(d, rotateShape(base, d));
+            m.put(d, CrownShapes.build(base, d));
         }
         this.shapes = m;
         registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.UP));
@@ -88,40 +87,10 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
         // Сломали мастера → снести всю структуру (флаг DISSOLVING гасит рекурсию).
         if (!state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
-            DrillCrownMultiblock.breakStructure(level, pos); // pos = мастер
+            // Размер и направление берём из СВОЕГО старого состояния — мастер в мире уже заменён.
+            DrillCrownMultiblock.dissolve(level, pos, crownSize(), state.getValue(FACING));
         }
         super.onRemove(state, level, pos, newState, moved);
     }
 
-    // ── Поворот формы по FACING (та же конвенция, что DrillCrownStructure.rotate) ──
-
-    private static VoxelShape rotateShape(VoxelShape base, Direction facing) {
-        if (facing == Direction.UP) {
-            return base;
-        }
-        VoxelShape[] acc = { Shapes.empty() };
-        base.forAllBoxes((x1, y1, z1, x2, y2, z2) -> {
-            double[] a = rotPoint(x1, y1, z1, facing);
-            double[] b = rotPoint(x2, y2, z2, facing);
-            acc[0] = Shapes.or(acc[0], Shapes.box(
-                Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2]),
-                Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])));
-        });
-        return acc[0];
-    }
-
-    // Поворот точки вокруг центра блока (0.5,0.5,0.5); +Y модели → FACING.
-    private static double[] rotPoint(double x, double y, double z, Direction f) {
-        double cx = x - 0.5, cy = y - 0.5, cz = z - 0.5;
-        double rx, ry, rz;
-        switch (f) {
-            case DOWN  -> { rx = cx;  ry = -cy; rz = -cz; }
-            case NORTH -> { rx = cx;  ry = cz;  rz = -cy; }
-            case SOUTH -> { rx = cx;  ry = -cz; rz = cy;  }
-            case EAST  -> { rx = cy;  ry = -cx; rz = cz;  }
-            case WEST  -> { rx = -cy; ry = cx;  rz = cz;  }
-            default    -> { rx = cx;  ry = cy;  rz = cz;  }
-        }
-        return new double[]{ rx + 0.5, ry + 0.5, rz + 0.5 };
-    }
 }

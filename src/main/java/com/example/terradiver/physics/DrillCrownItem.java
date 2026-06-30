@@ -3,6 +3,8 @@ package com.example.terradiver.physics;
 import com.example.terradiver.registry.BlockRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -44,10 +46,14 @@ public class DrillCrownItem extends BlockItem {
 
         List<BlockPos> cells = DrillCrownStructure.worldCells(master.crownSize(), facing, masterPos);
 
-        // Проверка места: все ячейки должны быть заменяемыми (воздух/трава и т.п.).
+        // Проверка места: все ячейки должны быть заменяемыми (воздух/трава и т.п.)
+        // И свободны от живых существ (иначе игрок окажется замурован и начнёт задыхаться).
         for (BlockPos cell : cells) {
             if (!level.getBlockState(cell).canBeReplaced(context)) {
                 return InteractionResult.FAIL; // нет места (в будущем — предупреждение игроку)
+            }
+            if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(cell)).isEmpty()) {
+                return InteractionResult.FAIL; // в ячейке живое существо
             }
         }
 
@@ -56,13 +62,17 @@ public class DrillCrownItem extends BlockItem {
             level.setBlock(masterPos, masterState, Block.UPDATE_ALL);
 
             Block partBlock = BlockRegistry.DRILL_CROWN_PART.get();
-            for (BlockPos cell : cells) {
+            String size = master.crownSize();
+            for (int[] off : DrillCrownStructure.cells(size)) {
+                int[] r = DrillCrownStructure.rotate(off, facing);
+                BlockPos cell = masterPos.offset(r[0], r[1], r[2]);
                 if (cell.equals(masterPos)) {
                     continue;
                 }
                 level.setBlock(cell, partBlock.defaultBlockState(), Block.UPDATE_ALL);
                 if (level.getBlockEntity(cell) instanceof DrillCrownPartBlockEntity be) {
                     be.setMaster(masterPos);
+                    be.setShapeData(size, off[0], off[1], off[2], facing);
                 }
             }
 

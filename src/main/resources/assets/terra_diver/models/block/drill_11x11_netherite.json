@@ -1,6 +1,7 @@
 {
   "loader": "neoforge:obj",
   "flip_v": true,
+  "ambientocclusion": false,
   "model": "terra_diver:models/block/drill/drill_11x11.obj",
   "textures": {
     "body": "terra_diver:block/drill_body_netherite",
@@ -57,6 +58,54 @@
         0.0155,
         0.0155,
         0.0155
+      ]
+    },
+    "thirdperson_righthand": {
+      "scale": [
+        0,
+        0,
+        0
+      ]
+    },
+    "thirdperson_lefthand": {
+      "scale": [
+        0,
+        0,
+        0
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.015,
+        0.015,
+        0.015
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        0.015,
+        0.015,
+        0.015
       ]
     }
   }

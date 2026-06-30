@@ -32,7 +32,11 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return Shapes.block(); // полный куб: ходимо и выделяемо
+        // Форма ячейки: полный куб (внутренняя) или точные краевые суб-воксели — из BE.
+        if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
+            return be.getShape();
+        }
+        return Shapes.block();
     }
 
     @Nullable
@@ -57,7 +61,10 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
         // когда разборка сама удаляет остальные ячейки.
         if (!state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
             if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
-                DrillCrownMultiblock.breakStructure(level, be.getMaster());
+                BlockState ms = level.getBlockState(be.getMaster());
+                if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {
+                    DrillCrownMultiblock.dissolve(level, be.getMaster(), m.crownSize(), m.crownFacing(ms));
+                }
             }
         }
         super.onRemove(state, level, pos, newState, moved);

@@ -2,17 +2,16 @@ package com.example.terradiver.physics;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.List;
-
 /*
- * Сборка/разборка мультиблок-короны — общая логика мастера и дочерних ячеек. Разборка
- * идемпотентна и защищена от рекурсии флагом DISSOLVING: ломание ячейки во время разборки
- * не запускает разборку заново. См. DrillCrownStructure (раскладка) и DrillCrownPartBlock.
+ * Сборка/разборка мультиблок-короны — общая логика мастера и дочерних ячеек. Разборка защищена
+ * от рекурсии флагом DISSOLVING. Размер и направление передаются ЯВНО (мастер при сломе уже
+ * заменён на воздух, прочитать его из мира нельзя — берём из старого BlockState). См.
+ * DrillCrownStructure (раскладка) и DrillCrownPartBlock.
  */
 public final class DrillCrownMultiblock {
 
@@ -31,22 +30,16 @@ public final class DrillCrownMultiblock {
     }
 
     /*
-     * Снести всю структуру по позиции мастера. Безопасно звать из onRemove любой ячейки.
-     * Дроп предмета пока не делается (removeBlock без дропа) — экономику добавим отдельно.
+     * Снести всю структуру: размер и направление заданы явно (надёжно и при сломе мастера, когда
+     * его уже нет в мире). Идемпотентно: флаг DISSOLVING гасит повторный вход во время разборки.
      */
-    public static void breakStructure(Level level, BlockPos masterPos) {
+    public static void dissolve(Level level, BlockPos masterPos, String size, Direction facing) {
         if (DISSOLVING.get()) {
             return;
         }
-        BlockState masterState = level.getBlockState(masterPos);
-        if (!(masterState.getBlock() instanceof Master master)) {
-            return; // мастера уже нет, или это не корона
-        }
         DISSOLVING.set(Boolean.TRUE);
         try {
-            List<BlockPos> cells = DrillCrownStructure.worldCells(
-                master.crownSize(), master.crownFacing(masterState), masterPos);
-            for (BlockPos cell : cells) {
+            for (BlockPos cell : DrillCrownStructure.worldCells(size, facing, masterPos)) {
                 if (isCrownCell(level.getBlockState(cell))) {
                     level.removeBlock(cell, false);
                 }
