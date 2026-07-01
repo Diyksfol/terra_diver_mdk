@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-06-30 12:02 UTC_
+_Обновлён: 2026-07-01 06:33 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -21,6 +21,7 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/drilling/DrillingUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillingUtils.java)
 - [src/main/java/com/example/terradiver/item/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/item/package-info.java)
 - [src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java)
+- [src/main/java/com/example/terradiver/mixin/SlotMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/SlotMixin.java)
 - [src/main/java/com/example/terradiver/navigation/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/navigation/package-info.java)
 - [src/main/java/com/example/terradiver/physics/AmbientSignal.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/AmbientSignal.java)
 - [src/main/java/com/example/terradiver/physics/CrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownBlock.java)
