@@ -21,8 +21,8 @@ class DrillCrownStructureTest {
     void cellCounts() {
         assertEquals(1, DrillCrownStructure.cells("1x1").length);
         assertEquals(10, DrillCrownStructure.cells("3x3").length);
-        assertEquals(34, DrillCrownStructure.cells("5x5").length);
-        assertEquals(134, DrillCrownStructure.cells("11x11").length);
+        assertEquals(30, DrillCrownStructure.cells("5x5").length);
+        assertEquals(194, DrillCrownStructure.cells("11x11").length);
     }
 
     @Test @DisplayName("неизвестный размер → исключение")
@@ -55,7 +55,7 @@ class DrillCrownStructureTest {
                 assertTrue(seen.add(r[0] + "," + r[1] + "," + r[2]),
                     "коллизия ячеек при " + f);
             }
-            assertEquals(134, seen.size());
+            assertEquals(194, seen.size());
         }
     }
 

@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.util.Mth;
@@ -15,10 +16,12 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.client.event.RenderPlayerEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 
@@ -37,7 +40,7 @@ public class DrillClientExtensions {
     private static final float SCALE = 0.5F; // - TUNE
     // Сдвиг вдоль линии плеч к центру. Модель центрирована в 0.5; бур был у левой руки,
     // поэтому добавляем половину ширины плеч. Если уехало не туда — поменяй знак 0.7 на -0.7.
-    private static final double CENTER_X = -0.5D + 0.525D; // - TUNE
+    private static final double CENTER_X = -0.5D + 0.5D; // - TUNE
 
     // Размер короны для предмета, либо null если это не корона.
     private static String crownSize(ItemStack stack) {
@@ -105,6 +108,51 @@ public class DrillClientExtensions {
             stack, ItemDisplayContext.NONE,
             event.getPackedLight(), OverlayTexture.NO_OVERLAY,
             pose, event.getMultiBufferSource(), player.level(), 0);
+        pose.popPose();
+    }
+
+    // Рендер бура над собой в виде от первого лица. Модель игрока в 1-м лице не рисуется,
+    // поэтому RenderPlayerEvent не срабатывает — рисуем в мировых координатах над игроком.
+    // Третье лицо остаётся на RenderPlayerEvent, двойного рендера нет (проверка isFirstPerson).
+    @SubscribeEvent
+    static void onRenderLevelStage(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
+            return;
+        }
+        Minecraft mc = Minecraft.getInstance();
+        if (!mc.options.getCameraType().isFirstPerson()) {
+            return;
+        }
+        Player player = mc.player;
+        if (player == null) {
+            return;
+        }
+        ItemStack stack = liftedDrill(player);
+        if (stack.isEmpty()) {
+            return;
+        }
+        float pt = event.getPartialTick().getGameTimeDeltaPartialTick(false);
+        Vec3 cam = event.getCamera().getPosition();
+        double px = Mth.lerp(pt, player.xo, player.getX());
+        double py = Mth.lerp(pt, player.yo, player.getY());
+        double pz = Mth.lerp(pt, player.zo, player.getZ());
+
+        PoseStack pose = event.getPoseStack();
+        pose.pushPose();
+        pose.translate(px - cam.x, py - cam.y, pz - cam.z);      // от камеры к игроку (мир)
+        float bodyYaw = Mth.lerp(pt, player.yBodyRotO, player.yBodyRot);
+        pose.translate(0.0D, player.getBbHeight() + 0.4D, 0.0D); // над головой - TUNE (как в 3-м лице)
+        pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));
+        pose.scale(SCALE, SCALE, SCALE);
+        pose.translate(CENTER_X, 0.0D, -0.5D);
+
+        int light = LevelRenderer.getLightColor(player.level(), player.blockPosition().above(2));
+        var buffers = mc.renderBuffers().bufferSource();
+        mc.getItemRenderer().renderStatic(
+            stack, ItemDisplayContext.NONE,
+            light, OverlayTexture.NO_OVERLAY,
+            pose, buffers, player.level(), 0);
+        buffers.endBatch();
         pose.popPose();
     }
 }
