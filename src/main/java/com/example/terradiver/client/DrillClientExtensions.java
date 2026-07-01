@@ -37,7 +37,7 @@ public class DrillClientExtensions {
     private static final float SCALE = 0.5F; // - TUNE
     // Сдвиг вдоль линии плеч к центру. Модель центрирована в 0.5; бур был у левой руки,
     // поэтому добавляем половину ширины плеч. Если уехало не туда — поменяй знак 0.7 на -0.7.
-    private static final double CENTER_X = -0.5D + 0.35D; // - TUNE
+    private static final double CENTER_X = -0.5D + 0.525D; // - TUNE
 
     // Размер короны для предмета, либо null если это не корона.
     private static String crownSize(ItemStack stack) {
