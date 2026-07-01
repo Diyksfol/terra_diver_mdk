@@ -7,14 +7,18 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingSwapItemsEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
 /*
- * Пока в основной руке буровая корона (кроме 1x1), вторая рука принудительно пуста:
- * любой предмет из второй руки уезжает в инвентарь. Это убирает нелогичность
- * (щит/блок во второй руке, пока бур висит над головой). Серверная логика.
- * На заметку: «возврат предмета после снятия бура» пока не делаем — это потребовало бы
- * хранить вытесненный предмет; сейчас он просто кладётся в инвентарь.
+ * Держит буровую корону (кроме 1x1) строго в основной руке, вторую руку — пустой.
+ * Два уровня защиты:
+ *  1) LivingSwapItemsEvent.Hands (серверно, в handlePlayerAction) — отменяем сам своп F,
+ *     если во вторую руку уехал бы бур. Бьёт в источник: нет ни мигания, ни бура в левой руке.
+ *     GUI-постановку во вторую руку ловит SlotMixin (Slot.mayPlace).
+ *  2) Серверный тик — страховка: если бур всё же оказался во второй руке (иной путь) — вернуть
+ *     в основную (или в инвентарь); а пока бур в основной — вторая рука принудительно пуста.
+ * На заметку: «возврат вытесненного предмета после снятия бура» не делаем — он просто в инвентарь.
  */
 @EventBusSubscriber(modid = "terra_diver")
 public class DrillOffhandLock {
@@ -25,17 +29,40 @@ public class DrillOffhandLock {
                 && !"1x1".equals(block.crownSize());
     }
 
+    // 1) Отмена F-свопа, если бур уехал бы во вторую руку. getItemSwappedToOffHand() — предмет,
+    //    который попадёт в левую руку (= сейчас в правой). Обратный своп (бур из левой в правую)
+    //    не трогаем — он как раз возвращает бур на место.
+    @SubscribeEvent
+    static void onSwapHands(LivingSwapItemsEvent.Hands event) {
+        if (isLiftedDrill(event.getItemSwappedToOffHand())) {
+            event.setCanceled(true);
+        }
+    }
+
+    // 2) Серверная страховка на тик.
     @SubscribeEvent
     static void onPlayerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
         if (player.level().isClientSide) {
             return;
         }
-        if (!isLiftedDrill(player.getMainHandItem())) {
+        ItemStack main = player.getMainHandItem();
+        ItemStack off = player.getOffhandItem();
+
+        // Бур каким-то путём попал во вторую руку → вернуть в основную, иначе в инвентарь.
+        if (isLiftedDrill(off)) {
+            ItemStack drill = off.copy();
+            player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
+            if (main.isEmpty()) {
+                player.setItemInHand(InteractionHand.MAIN_HAND, drill);
+            } else if (!player.getInventory().add(drill)) {
+                player.drop(drill, false);
+            }
             return;
         }
-        ItemStack off = player.getOffhandItem();
-        if (!off.isEmpty()) {
+
+        // Бур в основной руке → вторая рука пуста.
+        if (isLiftedDrill(main) && !off.isEmpty()) {
             ItemStack moved = off.copy();
             player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
             if (!player.getInventory().add(moved)) {

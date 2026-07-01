@@ -20,9 +20,11 @@ class DrillCrownStructureTest {
     @Test @DisplayName("число ячеек тела по размерам")
     void cellCounts() {
         assertEquals(1, DrillCrownStructure.cells("1x1").length);
-        assertEquals(10, DrillCrownStructure.cells("3x3").length);
-        assertEquals(30, DrillCrownStructure.cells("5x5").length);
-        assertEquals(194, DrillCrownStructure.cells("11x11").length);
+        assertEquals(14, DrillCrownStructure.cells("3x3").length);
+        assertEquals(34, DrillCrownStructure.cells("5x5").length);
+        assertEquals(82, DrillCrownStructure.cells("7x7").length);
+        assertEquals(126, DrillCrownStructure.cells("9x9").length);
+        assertEquals(190, DrillCrownStructure.cells("11x11").length);
     }
 
     @Test @DisplayName("неизвестный размер → исключение")
@@ -55,7 +57,7 @@ class DrillCrownStructureTest {
                 assertTrue(seen.add(r[0] + "," + r[1] + "," + r[2]),
                     "коллизия ячеек при " + f);
             }
-            assertEquals(194, seen.size());
+            assertEquals(190, seen.size());
         }
     }
 
@@ -63,9 +65,38 @@ class DrillCrownStructureTest {
     void masterIsFirst() {
         BlockPos master = new BlockPos(10, 64, -5);
         List<BlockPos> cells = DrillCrownStructure.worldCells("3x3", Direction.UP, master);
-        assertEquals(10, cells.size());
+        assertEquals(14, cells.size());
         assertTrue(cells.contains(master), "мастер входит в структуру");
         // смещение (0,0,0) присутствует → сам master в списке
+    }
+
+    @Test @DisplayName("footprint конуса симметричен: инвариант к поворотам на 90° и зеркалам")
+    void symmetricFootprint() {
+        // Конус аналитический (gen7), проверка по центру восьмушки => набор ячеек каждого слоя
+        // глубины обязан быть инвариантен к 90°-повороту (ox,oz)->(-oz,ox) и обоим зеркалам.
+        for (String size : new String[]{"3x3", "5x5", "7x7", "9x9", "11x11"}) {
+            // сгруппировать по слою глубины oy
+            Set<Integer> layers = new HashSet<>();
+            for (int[] c : DrillCrownStructure.cells(size)) {
+                layers.add(c[1]);
+            }
+            for (int oy : layers) {
+                Set<String> layer = new HashSet<>();
+                for (int[] c : DrillCrownStructure.cells(size)) {
+                    if (c[1] == oy) {
+                        layer.add(c[0] + "," + c[2]);
+                    }
+                }
+                for (String key : layer) {
+                    String[] p = key.split(",");
+                    int ox = Integer.parseInt(p[0]);
+                    int oz = Integer.parseInt(p[1]);
+                    assertTrue(layer.contains((-oz) + "," + ox), size + " oy=" + oy + ": нет 90°-образа (" + ox + "," + oz + ")");
+                    assertTrue(layer.contains((-ox) + "," + oz), size + " oy=" + oy + ": нет X-зеркала (" + ox + "," + oz + ")");
+                    assertTrue(layer.contains(ox + "," + (-oz)), size + " oy=" + oy + ": нет Z-зеркала (" + ox + "," + oz + ")");
+                }
+            }
+        }
     }
 
     @Test @DisplayName("worldCells: горизонтальная постановка уводит глубину вбок, не вверх")

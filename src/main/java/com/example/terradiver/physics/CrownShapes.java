@@ -21,7 +21,9 @@ public final class CrownShapes {
                 Math.min(a[0], c[0]), Math.min(a[1], c[1]), Math.min(a[2], c[2]),
                 Math.max(a[0], c[0]), Math.max(a[1], c[1]), Math.max(a[2], c[2])));
         }
-        return acc;
+        // Слить копланарные боксы: убирает внутренние грани между восьмушками, за которые
+        // иначе цепляется/выталкивает игрока при ходьбе по телу короны (см. точка 5).
+        return acc.optimize();
     }
 
     private static double[] rot(double x, double y, double z, Direction f) {

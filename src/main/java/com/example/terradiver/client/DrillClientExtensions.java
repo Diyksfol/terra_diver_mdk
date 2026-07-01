@@ -41,6 +41,10 @@ public class DrillClientExtensions {
     // Сдвиг вдоль линии плеч к центру. Модель центрирована в 0.5; бур был у левой руки,
     // поэтому добавляем половину ширины плеч. Если уехало не туда — поменяй знак 0.7 на -0.7.
     private static final double CENTER_X = -0.5D + 0.5D; // - TUNE
+    // Сдвиг ВПЕРЁД/НАЗАД по взгляду игрока (ось Z после поворота по телу). Было -0.5 — из-за него
+    // бур уезжал вперёд по взгляду. Обнулил (0.0). В мире смещение ≈ CENTER_Z * SCALE.
+    // Крутить: отрицательное = вперёд по взгляду, положительное = назад. - TUNE
+    private static final double CENTER_Z = 0.0D; // - TUNE (было -0.5)
 
     // Размер короны для предмета, либо null если это не корона.
     private static String crownSize(ItemStack stack) {
@@ -101,7 +105,7 @@ public class DrillClientExtensions {
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));  // поворот вслед за игроком
         // без наклона: ось бура +Y смотрит вверх, диск смотрит вверх, мастер (Y=0) снизу у рук
         pose.scale(SCALE, SCALE, SCALE);
-        pose.translate(CENTER_X, 0.0D, -0.5D);                    // центр: CENTER_X вдоль линии плеч - TUNE
+        pose.translate(CENTER_X, 0.0D, CENTER_Z);                    // центр: CENTER_X вдоль линии плеч - TUNE
 
         Minecraft mc = Minecraft.getInstance();
         mc.getItemRenderer().renderStatic(
@@ -144,7 +148,7 @@ public class DrillClientExtensions {
         pose.translate(0.0D, player.getBbHeight() + 0.4D, 0.0D); // над головой - TUNE (как в 3-м лице)
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));
         pose.scale(SCALE, SCALE, SCALE);
-        pose.translate(CENTER_X, 0.0D, -0.5D);
+        pose.translate(CENTER_X, 0.0D, CENTER_Z);
 
         int light = LevelRenderer.getLightColor(player.level(), player.blockPosition().above(2));
         var buffers = mc.renderBuffers().bufferSource();
