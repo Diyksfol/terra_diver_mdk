@@ -45,6 +45,9 @@ public class DrillClientExtensions {
     // бур уезжал вперёд по взгляду. Обнулил (0.0). В мире смещение ≈ CENTER_Z * SCALE.
     // Крутить: отрицательное = вперёд по взгляду, положительное = назад. - TUNE
     private static final double CENTER_Z = 0.0D; // - TUNE (было -0.5)
+    // Высота бура над головой (мировые блоки, до масштабирования). Было 0.4 — бур висел на 2 пикселя
+    // выше рук. Опустил на 2 пикселя (2/16 = 0.125). Шаг тонкой подстройки: 1 пиксель = 0.0625. - TUNE
+    private static final double ABOVE_HEAD = 0.275D; // - TUNE (было 0.4; -0.125 = -2px)
 
     // Размер короны для предмета, либо null если это не корона.
     private static String crownSize(ItemStack stack) {
@@ -101,7 +104,7 @@ public class DrillClientExtensions {
         pose.pushPose();
 
         float bodyYaw = Mth.lerp(event.getPartialTick(), player.yBodyRotO, player.yBodyRot);
-        pose.translate(0.0D, player.getBbHeight() + 0.4D, 0.0D);  // над головой - TUNE
+        pose.translate(0.0D, player.getBbHeight() + ABOVE_HEAD, 0.0D);  // над головой - TUNE
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));  // поворот вслед за игроком
         // без наклона: ось бура +Y смотрит вверх, диск смотрит вверх, мастер (Y=0) снизу у рук
         pose.scale(SCALE, SCALE, SCALE);
@@ -145,7 +148,7 @@ public class DrillClientExtensions {
         pose.pushPose();
         pose.translate(px - cam.x, py - cam.y, pz - cam.z);      // от камеры к игроку (мир)
         float bodyYaw = Mth.lerp(pt, player.yBodyRotO, player.yBodyRot);
-        pose.translate(0.0D, player.getBbHeight() + 0.4D, 0.0D); // над головой - TUNE (как в 3-м лице)
+        pose.translate(0.0D, player.getBbHeight() + ABOVE_HEAD, 0.0D); // над головой - TUNE (как в 3-м лице)
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));
         pose.scale(SCALE, SCALE, SCALE);
         pose.translate(CENTER_X, 0.0D, CENTER_Z);

@@ -32,11 +32,33 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        // Форма ячейки: полный куб (внутренняя) или точные краевые суб-воксели — из BE.
+        // Контур/выделение ячейки: полный куб (внутренняя) или точные краевые суб-воксели — из BE.
         if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
             return be.getShape();
         }
         return Shapes.block();
+    }
+
+    // Коллизия — всегда полный куб, НЕ суб-воксельная форма ячейки. Причина: суб-воксельные
+    // краевые ячейки давали полу-блочные ступеньки (0.5) уже, чем игрок (0.6) — стоя на скосе,
+    // хитбокс залезал в соседнюю ячейку выше и его выталкивало вбок. Полноблочные ячейки шире
+    // игрока, поэтому по короне можно стоять устойчиво (как по обычным блокам). Визуально контур
+    // остаётся точным (getShape), меняется только физика столкновений.
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
+        return Shapes.block();
+    }
+
+    // Не затеняем соседей: короне-мультиблоку не нужно блокировать небесный свет — иначе блок,
+    // поставленный под мастером/ячейкой, уходит в тень (тёмная нижняя грань). Пропускаем свет насквозь.
+    @Override
+    public int getLightBlock(BlockState state, BlockGetter level, BlockPos pos) {
+        return 0;
+    }
+
+    @Override
+    public boolean propagatesSkylightDown(BlockState state, BlockGetter level, BlockPos pos) {
+        return true;
     }
 
     @Nullable
@@ -63,7 +85,7 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
             if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
                 BlockState ms = level.getBlockState(be.getMaster());
                 if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {
-                    DrillCrownMultiblock.dissolve(level, be.getMaster(), m.crownSize(), m.crownFacing(ms));
+                    DrillCrownMultiblock.dissolve(level, be.getMaster(), m.crownSize(), m.crownFacing(ms), ms);
                 }
             }
         }
