@@ -72,6 +72,30 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         return shapes.get(state.getValue(FACING));
     }
 
+    // Не затеняем соседей: корона не блокирует небесный свет, иначе блок под мастером уходит в тень
+    // (тёмная нижняя грань). Пропускаем свет насквозь. То же самое сделано на дочерних ячейках.
+    @Override
+    public int getLightBlock(BlockState state, BlockGetter level, BlockPos pos) {
+        return 0;
+    }
+
+    @Override
+    public boolean propagatesSkylightDown(BlockState state, BlockGetter level, BlockPos pos) {
+        return true;
+    }
+
+    // Ванильные частицы разрушения подавляем — свои, покрашенные по материалу, сыплет dissolve.
+    @Override
+    public void initializeClient(java.util.function.Consumer<net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions> consumer) {
+        consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions() {
+            @Override
+            public boolean addDestroyEffects(BlockState s, Level l, BlockPos p,
+                                             net.minecraft.client.particle.ParticleEngine mgr) {
+                return true;
+            }
+        });
+    }
+
     // ── DrillCrownMultiblock.Master ──
     @Override
     public String crownSize() {
@@ -88,7 +112,7 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         // Сломали мастера → снести всю структуру (флаг DISSOLVING гасит рекурсию).
         if (!state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
             // Размер и направление берём из СВОЕГО старого состояния — мастер в мире уже заменён.
-            DrillCrownMultiblock.dissolve(level, pos, crownSize(), state.getValue(FACING));
+            DrillCrownMultiblock.dissolve(level, pos, crownSize(), state.getValue(FACING), state);
         }
         super.onRemove(state, level, pos, newState, moved);
     }

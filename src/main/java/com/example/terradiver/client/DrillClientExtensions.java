@@ -45,9 +45,13 @@ public class DrillClientExtensions {
     // бур уезжал вперёд по взгляду. Обнулил (0.0). В мире смещение ≈ CENTER_Z * SCALE.
     // Крутить: отрицательное = вперёд по взгляду, положительное = назад. - TUNE
     private static final double CENTER_Z = 0.0D; // - TUNE (было -0.5)
-    // Высота бура над головой (мировые блоки, до масштабирования). Было 0.4 — бур висел на 2 пикселя
-    // выше рук. Опустил на 2 пикселя (2/16 = 0.125). Шаг тонкой подстройки: 1 пиксель = 0.0625. - TUNE
-    private static final double ABOVE_HEAD = 0.275D; // - TUNE (было 0.4; -0.125 = -2px)
+    // Высота бура над головой (мировые блоки, до масштабирования). Отсчёт от 0.4: сначала опустили
+    // на 2 пикселя, затем подняли на 1 → итог -1 пиксель (-0.0625) от исходного. Шаг = 1px = 0.0625. - TUNE
+    private static final double ABOVE_HEAD = 0.3375D; // - TUNE (было 0.4; итог -0.0625 = -1px)
+    // В 1-м лице якорим модель к СГЛАЖЕННОЙ высоте камеры (глаз), а не к мгновенному bbHeight.
+    // HEAD_ABOVE_EYE — насколько макушка выше глаз стоя (1.8 - 1.62). Держим константой, чтобы при
+    // приседании не было мгновенного скачка: модель опускается ровно со скоростью камеры. - TUNE
+    private static final double HEAD_ABOVE_EYE = 0.18D; // - TUNE
 
     // Размер короны для предмета, либо null если это не корона.
     private static String crownSize(ItemStack stack) {
@@ -141,14 +145,15 @@ public class DrillClientExtensions {
         float pt = event.getPartialTick().getGameTimeDeltaPartialTick(false);
         Vec3 cam = event.getCamera().getPosition();
         double px = Mth.lerp(pt, player.xo, player.getX());
-        double py = Mth.lerp(pt, player.yo, player.getY());
         double pz = Mth.lerp(pt, player.zo, player.getZ());
 
         PoseStack pose = event.getPoseStack();
         pose.pushPose();
-        pose.translate(px - cam.x, py - cam.y, pz - cam.z);      // от камеры к игроку (мир)
+        // Горизонталь — к игроку; вертикаль — к СГЛАЖЕННОЙ высоте камеры (cam.y уже интерполируется
+        // при приседании). Иначе модель падала бы рывком по мгновенному bbHeight, пока камера ещё
+        // плавно опускается, и голова на пару кадров влезала в модель. Только для 1-го лица.
         float bodyYaw = Mth.lerp(pt, player.yBodyRotO, player.yBodyRot);
-        pose.translate(0.0D, player.getBbHeight() + ABOVE_HEAD, 0.0D); // над головой - TUNE (как в 3-м лице)
+        pose.translate(px - cam.x, HEAD_ABOVE_EYE + ABOVE_HEAD, pz - cam.z);
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));
         pose.scale(SCALE, SCALE, SCALE);
         pose.translate(CENTER_X, 0.0D, CENTER_Z);

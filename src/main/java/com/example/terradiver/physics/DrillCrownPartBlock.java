@@ -8,7 +8,10 @@ import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -39,14 +42,34 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
         return Shapes.block();
     }
 
-    // Коллизия — всегда полный куб, НЕ суб-воксельная форма ячейки. Причина: суб-воксельные
-    // краевые ячейки давали полу-блочные ступеньки (0.5) уже, чем игрок (0.6) — стоя на скосе,
-    // хитбокс залезал в соседнюю ячейку выше и его выталкивало вбок. Полноблочные ячейки шире
-    // игрока, поэтому по короне можно стоять устойчиво (как по обычным блокам). Визуально контур
-    // остаётся точным (getShape), меняется только физика столкновений.
+    // Коллизия — полноширинная «ступень», НЕ точная суб-воксельная форма и НЕ грубый полный куб.
+    // По горизонтали ячейка всегда 1×1 (шире игрока 0.6 — не за что цепляться и выталкиваться вбок),
+    // по вертикали — реальная высота формы ячейки. Так сохраняется ощущение ступенчатого скоса
+    // (полушаги 0.5), но исчезает выталкивание, которое давали узкие (0.5) суб-воксельные грани.
+    // Контур/выделение (getShape) остаётся точным — меняется только физика столкновений.
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return Shapes.block();
+        VoxelShape shape = level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be
+                ? be.getShape() : Shapes.block();
+        if (shape.isEmpty()) {
+            return Shapes.empty();
+        }
+        var b = shape.bounds();
+        return Shapes.box(0.0D, b.minY, 0.0D, 1.0D, b.maxY, 1.0D);
+    }
+
+    // Свои частицы разрушения (в dissolve) красим по материалу мастера, а ванильные — подавляем:
+    // у ведомой ячейки они брались бы из модели drill_crown_part (медь), из-за чего сломанный блок
+    // сыпал «не тем» цветом. Возвращаем true → ванильных частиц нет, остаются только правильные.
+    @Override
+    public void initializeClient(java.util.function.Consumer<net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions> consumer) {
+        consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions() {
+            @Override
+            public boolean addDestroyEffects(BlockState s, net.minecraft.world.level.Level l, BlockPos p,
+                                             net.minecraft.client.particle.ParticleEngine mgr) {
+                return true;
+            }
+        });
     }
 
     // Не затеняем соседей: короне-мультиблоку не нужно блокировать небесный свет — иначе блок,
@@ -59,6 +82,19 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
     @Override
     public boolean propagatesSkylightDown(BlockState state, BlockGetter level, BlockPos pos) {
         return true;
+    }
+
+    // Средний клик (pick block) по любой ячейке короны, даже невидимой ведомой, должен давать сам
+    // предмет короны (как у мастера), а не пустоту. Читаем мастер из BE и возвращаем его предмет.
+    @Override
+    public ItemStack getCloneItemStack(BlockState state, HitResult target, LevelReader level, BlockPos pos, Player player) {
+        if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
+            BlockState ms = level.getBlockState(be.getMaster());
+            if (ms.getBlock() instanceof DrillCrownMultiblock.Master) {
+                return new ItemStack(ms.getBlock());
+            }
+        }
+        return super.getCloneItemStack(state, target, level, pos, player);
     }
 
     @Nullable

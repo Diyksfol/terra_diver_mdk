@@ -52,12 +52,14 @@ public final class DrillCrownMultiblock {
             BlockParticleOption particle = server != null && particleState != null
                     ? new BlockParticleOption(ParticleTypes.BLOCK, particleState) : null;
             for (BlockPos cell : DrillCrownStructure.worldCells(size, facing, masterPos)) {
+                // Частицы — по КАЖДОЙ ячейке футпринта, включая уже сломанную (её ванильные частицы
+                // подавлены, иначе она сыпала бы «не тем» цветом). Красим все по материалу мастера.
+                if (particle != null) {
+                    server.sendParticles(particle,
+                            cell.getX() + 0.5D, cell.getY() + 0.5D, cell.getZ() + 0.5D,
+                            PARTICLES_PER_CELL, 0.3D, 0.3D, 0.3D, 0.0D);
+                }
                 if (isCrownCell(level.getBlockState(cell))) {
-                    if (particle != null) {
-                        server.sendParticles(particle,
-                                cell.getX() + 0.5D, cell.getY() + 0.5D, cell.getZ() + 0.5D,
-                                PARTICLES_PER_CELL, 0.3D, 0.3D, 0.3D, 0.0D);
-                    }
                     level.removeBlock(cell, false);
                 }
             }
