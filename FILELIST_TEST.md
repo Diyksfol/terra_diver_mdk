@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-07-01 07:42 UTC_
+_Обновлён: 2026-07-03 07:09 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -20,6 +20,7 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/drilling/DrillingRate.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillingRate.java)
 - [src/main/java/com/example/terradiver/drilling/DrillingUtils.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/drilling/DrillingUtils.java)
 - [src/main/java/com/example/terradiver/item/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/item/package-info.java)
+- [src/main/java/com/example/terradiver/mixin/ContainerOffhandMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/ContainerOffhandMixin.java)
 - [src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java)
 - [src/main/java/com/example/terradiver/mixin/SlotMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/SlotMixin.java)
 - [src/main/java/com/example/terradiver/navigation/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/navigation/package-info.java)
