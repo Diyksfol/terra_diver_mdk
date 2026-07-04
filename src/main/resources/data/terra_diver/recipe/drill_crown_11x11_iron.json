@@ -1,0 +1,22 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    " BBB ",
+    "BBBBB",
+    "BBCBB",
+    "BBBBB",
+    " BBB "
+  ],
+  "key": {
+    "C": {
+      "item": "terra_diver:drill_crown_9x9_iron"
+    },
+    "B": {
+      "item": "minecraft:iron_block"
+    }
+  },
+  "result": {
+    "id": "terra_diver:drill_crown_11x11_iron",
+    "count": 1
+  }
+}

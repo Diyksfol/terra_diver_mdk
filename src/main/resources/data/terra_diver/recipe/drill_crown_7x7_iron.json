@@ -1,0 +1,25 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    " SBS ",
+    "SBSBS",
+    "BSCSB",
+    "SBSBS",
+    " SBS "
+  ],
+  "key": {
+    "C": {
+      "item": "terra_diver:drill_crown_5x5_iron"
+    },
+    "S": {
+      "item": "create:iron_sheet"
+    },
+    "B": {
+      "item": "minecraft:iron_block"
+    }
+  },
+  "result": {
+    "id": "terra_diver:drill_crown_7x7_iron",
+    "count": 1
+  }
+}

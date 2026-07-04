@@ -1,0 +1,25 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    " SBS ",
+    "SSSSS",
+    "BSCSB",
+    "SSSSS",
+    " SBS "
+  ],
+  "key": {
+    "C": {
+      "item": "terra_diver:drill_crown_3x3_brass"
+    },
+    "S": {
+      "item": "create:brass_sheet"
+    },
+    "B": {
+      "item": "create:brass_block"
+    }
+  },
+  "result": {
+    "id": "terra_diver:drill_crown_5x5_brass",
+    "count": 1
+  }
+}

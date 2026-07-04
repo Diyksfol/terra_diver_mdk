@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " P ",
+    "PIP"
+  ],
+  "key": {
+    "P": {
+      "item": "create:brass_sheet"
+    },
+    "I": {
+      "item": "create:brass_ingot"
+    }
+  },
+  "result": {
+    "id": "terra_diver:drill_crown_1x1_brass",
+    "count": 1
+  }
+}

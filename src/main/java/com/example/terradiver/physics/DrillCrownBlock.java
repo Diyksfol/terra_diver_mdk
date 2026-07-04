@@ -84,14 +84,16 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         return true;
     }
 
-    // Ванильные частицы разрушения подавляем — свои, покрашенные по материалу, сыплет dissolve.
+    // Ванильные частицы разрушения подавляем только у МУЛЬТИ-буров (свои, покрашенные по материалу,
+    // сыплет dissolve). У бура 1x1 оставляем обычные ванильные — они и так правильного цвета и полные.
     @Override
     public void initializeClient(java.util.function.Consumer<net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions> consumer) {
+        final boolean suppress = !"1x1".equals(crownSize());
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientBlockExtensions() {
             @Override
             public boolean addDestroyEffects(BlockState s, Level l, BlockPos p,
                                              net.minecraft.client.particle.ParticleEngine mgr) {
-                return true;
+                return suppress;
             }
         });
     }

@@ -12,6 +12,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.shapes.BooleanOp;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -42,11 +43,17 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
         return Shapes.block();
     }
 
-    // Коллизия — полноширинная «ступень», НЕ точная суб-воксельная форма и НЕ грубый полный куб.
-    // По горизонтали ячейка всегда 1×1 (шире игрока 0.6 — не за что цепляться и выталкиваться вбок),
-    // по вертикали — реальная высота формы ячейки. Так сохраняется ощущение ступенчатого скоса
-    // (полушаги 0.5), но исчезает выталкивание, которое давали узкие (0.5) суб-воксельные грани.
-    // Контур/выделение (getShape) остаётся точным — меняется только физика столкновений.
+    private static final VoxelShape BOTTOM_HALF = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.5D, 1.0D);
+    private static final VoxelShape TOP_HALF = Shapes.box(0.0D, 0.5D, 0.0D, 1.0D, 1.0D, 1.0D);
+
+    // Коллизия «как ступень», а не «как полный блок»:
+    //  - нижняя половина: если внизу есть форма — кладём ПОЛНОШИРИННУЮ плиту (0..0.5). Это опора во
+    //    всю клетку, шире игрока (0.6), поэтому под ним всегда есть куда встать — не выталкивает вбок
+    //    и не скатывает по конусу вниз (каскад ломается на этой плите).
+    //  - верхняя половина: берём РЕАЛЬНУЮ форму ячейки (ступень/бугор, не во всю клетку). Поэтому по
+    //    ощущению это ступень, а не полный блок, и коллизия совпадает с текстурой (не «толще» неё).
+    // Итог: игрок ходит по уровню плиты, верхние бугры переступает; ср. прошлый вариант, где любая
+    // ячейка с верхней восьмушкой схлопывалась в полный куб (оттого и «как блок»).
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
         VoxelShape shape = level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be
@@ -54,8 +61,10 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
         if (shape.isEmpty()) {
             return Shapes.empty();
         }
-        var b = shape.bounds();
-        return Shapes.box(0.0D, b.minY, 0.0D, 1.0D, b.maxY, 1.0D);
+        VoxelShape bottomReal = Shapes.join(shape, BOTTOM_HALF, BooleanOp.AND);
+        VoxelShape base = bottomReal.isEmpty() ? Shapes.empty() : BOTTOM_HALF;
+        VoxelShape topReal = Shapes.join(shape, TOP_HALF, BooleanOp.AND);
+        return Shapes.or(base, topReal);
     }
 
     // Свои частицы разрушения (в dissolve) красим по материалу мастера, а ванильные — подавляем:

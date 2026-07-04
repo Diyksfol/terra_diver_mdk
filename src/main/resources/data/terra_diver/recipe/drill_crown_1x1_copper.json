@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " P ",
+    "PIP"
+  ],
+  "key": {
+    "P": {
+      "item": "create:copper_sheet"
+    },
+    "I": {
+      "item": "minecraft:copper_ingot"
+    }
+  },
+  "result": {
+    "id": "terra_diver:drill_crown_1x1_copper",
+    "count": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    " NNN ",
+    " N N ",
+    "N D N",
+    " N N ",
+    " NNN "
+  ],
+  "key": {
+    "N": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "D": {
+      "item": "terra_diver:drill_crown_9x9_brass"
+    }
+  },
+  "result": {
+    "id": "terra_diver:drill_crown_9x9_netherite",
+    "count": 1
+  }
+}

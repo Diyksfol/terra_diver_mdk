@@ -1,0 +1,22 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    " SSS ",
+    "SSSSS",
+    "SSCSS",
+    "SSSSS",
+    " SSS "
+  ],
+  "key": {
+    "C": {
+      "item": "terra_diver:drill_crown_1x1_copper"
+    },
+    "S": {
+      "item": "create:copper_sheet"
+    }
+  },
+  "result": {
+    "id": "terra_diver:drill_crown_3x3_copper",
+    "count": 1
+  }
+}

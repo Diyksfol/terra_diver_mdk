@@ -22,9 +22,9 @@ public final class DrillCrownMultiblock {
 
     private static final ThreadLocal<Boolean> DISSOLVING = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
-    // Сколько частиц разрушения на одну ячейку короны. Мало — чтобы большие короны (до 190 ячеек)
-    // не выбрасывали сотни частиц разом. Крутить тут.
-    private static final int PARTICLES_PER_CELL = 2;
+    // Частиц разрушения на ячейку у МУЛЬТИ-буров. Мало — чтобы большие короны (до 190 ячеек) не
+    // выбрасывали сотни частиц разом. Бур 1x1 сюда не попадает — у него обычные ванильные частицы.
+    private static final int PARTICLES_PER_CELL = 3;
 
     /* Мастер-блок короны раскрывает размер и направление — для расчёта ячеек структуры. */
     public interface Master {
@@ -48,8 +48,10 @@ public final class DrillCrownMultiblock {
         try {
             // Частицы разрушения выбрасываем по ВСЕЙ короне, а не только по сломанной ячейке.
             // По PARTICLES_PER_CELL штук на ячейку — немного, чтобы не грузить клиент на больших коронах.
+            // Бур 1x1 исключение: у него свои частицы НЕ рисуем — оставляем полные ванильные (см. addDestroyEffects).
+            boolean single = "1x1".equals(size);
             ServerLevel server = level instanceof ServerLevel sl ? sl : null;
-            BlockParticleOption particle = server != null && particleState != null
+            BlockParticleOption particle = server != null && particleState != null && !single
                     ? new BlockParticleOption(ParticleTypes.BLOCK, particleState) : null;
             for (BlockPos cell : DrillCrownStructure.worldCells(size, facing, masterPos)) {
                 // Частицы — по КАЖДОЙ ячейке футпринта, включая уже сломанную (её ванильные частицы
