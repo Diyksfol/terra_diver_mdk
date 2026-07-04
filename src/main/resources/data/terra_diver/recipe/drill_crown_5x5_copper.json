@@ -21,5 +21,6 @@
   "result": {
     "id": "terra_diver:drill_crown_5x5_copper",
     "count": 1
-  }
+  },
+  "accept_mirrored": false
 }

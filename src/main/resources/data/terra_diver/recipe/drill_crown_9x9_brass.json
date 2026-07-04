@@ -21,5 +21,6 @@
   "result": {
     "id": "terra_diver:drill_crown_9x9_brass",
     "count": 1
-  }
+  },
+  "accept_mirrored": false
 }

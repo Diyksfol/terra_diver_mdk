@@ -21,5 +21,6 @@
   "result": {
     "id": "terra_diver:drill_crown_7x7_iron",
     "count": 1
-  }
+  },
+  "accept_mirrored": false
 }
