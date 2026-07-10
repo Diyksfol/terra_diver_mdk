@@ -1,11 +1,11 @@
 {
   "type": "create:mechanical_crafting",
   "pattern": [
-    " SBS ",
-    "SBSBS",
-    "BSCSB",
-    "SBSBS",
-    " SBS "
+    " SSS ",
+    "SBBBS",
+    "SBCBS",
+    "SBBBS",
+    " SSS "
   ],
   "key": {
     "C": {

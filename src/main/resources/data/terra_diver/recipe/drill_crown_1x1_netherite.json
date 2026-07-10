@@ -1,13 +1,17 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "ingredients": [
-    {
-      "item": "terra_diver:drill_crown_1x1_brass"
-    },
-    {
-      "item": "minecraft:netherite_ingot"
-    }
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "N",
+    "C"
   ],
+  "key": {
+    "N": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "C": {
+      "item": "terra_diver:drill_crown_1x1_brass"
+    }
+  },
   "result": {
     "id": "terra_diver:drill_crown_1x1_netherite",
     "count": 1

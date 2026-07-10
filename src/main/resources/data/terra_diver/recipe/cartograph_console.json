@@ -1,0 +1,41 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    "SRRRS",
+    "DESED",
+    "SMCGS",
+    "DEKED",
+    "SDDDS"
+  ],
+  "key": {
+    "S": {
+      "item": "create:sturdy_sheet"
+    },
+    "R": {
+      "item": "create:rose_quartz_lamp"
+    },
+    "D": {
+      "item": "minecraft:polished_deepslate_slab"
+    },
+    "E": {
+      "item": "create:electron_tube"
+    },
+    "M": {
+      "item": "create:precision_mechanism"
+    },
+    "C": {
+      "item": "create:brass_casing"
+    },
+    "G": {
+      "item": "simulated:gyroscopic_mechanism"
+    },
+    "K": {
+      "item": "minecraft:compass"
+    }
+  },
+  "result": {
+    "id": "terra_diver:cartograph_console",
+    "count": 1
+  },
+  "accept_mirrored": false
+}

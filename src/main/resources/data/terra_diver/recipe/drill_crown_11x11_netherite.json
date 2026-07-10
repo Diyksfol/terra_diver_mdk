@@ -3,7 +3,7 @@
   "pattern": [
     " NNN ",
     "NNNNN",
-    "NNDNN",
+    "NNCNN",
     "NNNNN",
     " NNN "
   ],
@@ -11,7 +11,7 @@
     "N": {
       "item": "minecraft:netherite_ingot"
     },
-    "D": {
+    "C": {
       "item": "terra_diver:drill_crown_11x11_brass"
     }
   },

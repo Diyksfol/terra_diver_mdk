@@ -1,0 +1,38 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    "SDVDS",
+    "DGFGD",
+    "SVAVS",
+    "DGMGD",
+    "SDVDS"
+  ],
+  "key": {
+    "S": {
+      "item": "create:sturdy_sheet"
+    },
+    "D": {
+      "item": "minecraft:polished_deepslate_slab"
+    },
+    "V": {
+      "item": "create:item_vault"
+    },
+    "G": {
+      "item": "create:cogwheel"
+    },
+    "F": {
+      "item": "create:flywheel"
+    },
+    "A": {
+      "item": "terra_diver:crown_bearing_andesite"
+    },
+    "M": {
+      "item": "terra_diver:drill_module"
+    }
+  },
+  "result": {
+    "id": "terra_diver:crown_bearing_sturdy",
+    "count": 1
+  },
+  "accept_mirrored": false
+}

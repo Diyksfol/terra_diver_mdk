@@ -1,28 +1,18 @@
 {
-  "type": "minecraft:crafting_shapeless",
-  "ingredients": [
-    {
-      "item": "terra_diver:drill_crown_5x5_brass"
-    },
-    {
-      "item": "minecraft:netherite_ingot"
-    },
-    {
-      "item": "minecraft:netherite_ingot"
-    },
-    {
-      "item": "minecraft:netherite_ingot"
-    },
-    {
-      "item": "minecraft:netherite_ingot"
-    },
-    {
-      "item": "minecraft:netherite_ingot"
-    },
-    {
-      "item": "minecraft:netherite_ingot"
-    }
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " N ",
+    "NCN",
+    "NNN"
   ],
+  "key": {
+    "N": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "C": {
+      "item": "terra_diver:drill_crown_5x5_brass"
+    }
+  },
   "result": {
     "id": "terra_diver:drill_crown_5x5_netherite",
     "count": 1
