@@ -5,6 +5,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import com.example.terradiver.physics.DrillCrownPartBlockEntity;
+import com.example.terradiver.kinetics.CrownBearingBlockEntity;
 
 
 public class BlockEntityRegistry {
@@ -15,4 +16,11 @@ public class BlockEntityRegistry {
         BLOCK_ENTITIES.register("drill_crown_part",
                 () -> BlockEntityType.Builder.of(DrillCrownPartBlockEntity::new,
                         BlockRegistry.DRILL_CROWN_PART.get()).build(null));
+
+    // Один тип BE на оба подшипника (андезитовый и прочный) — логика одинаковая.
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrownBearingBlockEntity>> CROWN_BEARING =
+        BLOCK_ENTITIES.register("crown_bearing",
+                () -> BlockEntityType.Builder.of(CrownBearingBlockEntity::new,
+                        BlockRegistry.CROWN_BEARING_ANDESITE.get(),
+                        BlockRegistry.CROWN_BEARING_STURDY.get()).build(null));
 }

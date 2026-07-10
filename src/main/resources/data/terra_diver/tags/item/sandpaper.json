@@ -1,0 +1,9 @@
+{
+  "values": [
+    "#create:sandpaper",
+    {
+      "id": "createaddition:dimond_grit_sandpaper",
+      "required": false
+    }
+  ]
+}

@@ -1,11 +1,11 @@
 {
   "type": "create:mechanical_crafting",
   "pattern": [
-    "  N  ",
-    "NNNNN",
-    " NCN ",
-    "NNNNN",
-    "  N  "
+    " N N ",
+    " NNN ",
+    "NNCNN",
+    " NNN ",
+    " N N "
   ],
   "key": {
     "N": {

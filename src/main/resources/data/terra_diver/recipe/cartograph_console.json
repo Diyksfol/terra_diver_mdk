@@ -2,10 +2,10 @@
   "type": "create:mechanical_crafting",
   "pattern": [
     "SRRRS",
-    "DESED",
+    "DEAED",
     "SMCGS",
     "DEKED",
-    "SDDDS"
+    "SDSDS"
   ],
   "key": {
     "S": {
@@ -31,6 +31,9 @@
     },
     "K": {
       "item": "minecraft:compass"
+    },
+    "A": {
+      "item": "create:golden_sheet"
     }
   },
   "result": {

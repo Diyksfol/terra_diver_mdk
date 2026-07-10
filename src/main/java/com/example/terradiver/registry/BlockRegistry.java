@@ -5,6 +5,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import com.example.terradiver.physics.DrillCrownBlock;
+import com.example.terradiver.kinetics.CrownBearingBlock;
 import com.example.terradiver.physics.DrillCrownPartBlock;
 
 public class BlockRegistry {
@@ -91,13 +92,13 @@ public class BlockRegistry {
 
     // ==================== OTHER BLOCKS ====================
     public static final DeferredHolder<Block, Block> CROWN_BEARING_ANDESITE =
-            BLOCKS.register("crown_bearing_andesite", () -> new Block(props()));
+            BLOCKS.register("crown_bearing_andesite", () -> new CrownBearingBlock(props().noOcclusion()));
     public static final DeferredHolder<Block, Block> CROWN_BEARING_STURDY =
-            BLOCKS.register("crown_bearing_sturdy", () -> new Block(props()));
+            BLOCKS.register("crown_bearing_sturdy", () -> new CrownBearingBlock(props().noOcclusion()));
     public static final DeferredHolder<Block, Block> PRESSURE_GAUGE =
             BLOCKS.register("pressure_gauge", () -> new Block(props()));
     public static final DeferredHolder<Block, Block> TERRADAR =
             BLOCKS.register("terradar", () -> new Block(props()));
     public static final DeferredHolder<Block, Block> CARTOGRAPH_CONSOLE =
             BLOCKS.register("cartograph_console", () -> new Block(props()));
-}
+}       

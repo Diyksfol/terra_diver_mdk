@@ -13,6 +13,12 @@ tasks.named('wrapper', Wrapper).configure {
     distributionType = Wrapper.DistributionType.BIN
 }
 
+tasks.named('jar', Jar) {
+    from(rootProject.file('LICENSE')) {
+        into 'META-INF'
+    }
+}
+
 version = mod_version
 group = mod_group_id
 

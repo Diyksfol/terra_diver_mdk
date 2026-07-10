@@ -2,7 +2,7 @@
   "type": "create:mechanical_crafting",
   "pattern": [
     "SOOOS",
-    "DESED",
+    "DEAED",
     "BMCPB",
     "DEXED",
     "SDHDS"
@@ -37,6 +37,9 @@
     },
     "H": {
       "item": "create:shaft"
+    },
+    "A": {
+      "item": "create:golden_sheet"
     }
   },
   "result": {

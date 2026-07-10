@@ -109,7 +109,7 @@
           "item": "terra_diver:incomplete_drill_module"
         },
         {
-          "item": "create:sand_paper"
+          "tag": "terra_diver:sandpaper"
         }
       ],
       "results": [
