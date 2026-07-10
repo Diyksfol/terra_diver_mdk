@@ -31,5 +31,6 @@
   "block.terra_diver.cartograph_console": "Cartograph Console",
   "item.terra_diver.piezo_element": "Piezo Element",
   "item.terra_diver.drill_module": "Drill Module",
+  "item.terra_diver.incomplete_drill_module": "Incomplete Drill Module",
   "itemGroup.terra_diver.terra_diver_tab": "Terra Diver"
 }

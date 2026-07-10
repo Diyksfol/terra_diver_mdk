@@ -31,5 +31,6 @@
   "block.terra_diver.cartograph_console": "Консоль картографа",
   "item.terra_diver.piezo_element": "Пьезоэлемент",
   "item.terra_diver.drill_module": "Буровой модуль",
+  "item.terra_diver.incomplete_drill_module": "Незаконченный буровой модуль",
   "itemGroup.terra_diver.terra_diver_tab": "Terra Diver"
 }

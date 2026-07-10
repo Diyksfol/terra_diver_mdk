@@ -86,4 +86,8 @@ public class ItemRegistry {
             ITEMS.register("piezo_element", () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, Item> DRILL_MODULE =
             ITEMS.register("drill_module", () -> new Item(new Item.Properties()));
+    // Переходный предмет для create:sequenced_assembly (Буровой модуль). Появляется на конвейере
+    // между проходами; Create требует, чтобы transitional_item был реально зарегистрирован.
+    public static final DeferredHolder<Item, Item> INCOMPLETE_DRILL_MODULE =
+            ITEMS.register("incomplete_drill_module", () -> new Item(new Item.Properties()));
 }

@@ -1,0 +1,45 @@
+{
+  "type": "create:mechanical_crafting",
+  "pattern": [
+    " GPG ",
+    "GLKLG",
+    "GRQRG",
+    "GLLLG",
+    "TTSTT",
+    " THT "
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:glass"
+    },
+    "P": {
+      "item": "minecraft:glass_pane"
+    },
+    "L": {
+      "item": "create:golden_sheet"
+    },
+    "K": {
+      "item": "minecraft:leather"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "Q": {
+      "item": "create:rose_quartz"
+    },
+    "T": {
+      "item": "minecraft:terracotta"
+    },
+    "S": {
+      "item": "simulated:spring"
+    },
+    "H": {
+      "item": "create:shaft"
+    }
+  },
+  "result": {
+    "id": "terra_diver:piezo_element",
+    "count": 1
+  },
+  "accept_mirrored": false
+}

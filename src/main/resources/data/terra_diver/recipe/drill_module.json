@@ -1,0 +1,154 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create:sturdy_sheet"
+  },
+  "loops": 5,
+  "results": [
+    {
+      "chance": 80.0,
+      "id": "terra_diver:drill_module"
+    },
+    {
+      "chance": 6.0,
+      "id": "create:sturdy_sheet"
+    },
+    {
+      "chance": 4.0,
+      "id": "create:shaft"
+    },
+    {
+      "chance": 3.5,
+      "id": "create:powdered_obsidian"
+    },
+    {
+      "chance": 2.3,
+      "id": "create:cogwheel"
+    },
+    {
+      "chance": 1.5,
+      "id": "minecraft:slime_ball"
+    },
+    {
+      "chance": 1.0,
+      "id": "create:brass_nugget"
+    },
+    {
+      "chance": 0.8,
+      "id": "minecraft:sand"
+    },
+    {
+      "chance": 0.5,
+      "id": "create:brass_hand"
+    },
+    {
+      "chance": 0.4,
+      "id": "simulated:gyroscopic_mechanism"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "terra_diver:incomplete_drill_module"
+        },
+        {
+          "item": "create:cogwheel"
+        }
+      ],
+      "results": [
+        {
+          "id": "terra_diver:incomplete_drill_module"
+        }
+      ]
+    },
+    {
+      "type": "create:filling",
+      "ingredients": [
+        {
+          "item": "terra_diver:incomplete_drill_module"
+        },
+        {
+          "type": "neoforge:components",
+          "amount": 250,
+          "fluids": "create:potion",
+          "components": {
+            "minecraft:potion_contents": {
+              "potion": "minecraft:oozing"
+            }
+          }
+        }
+      ],
+      "results": [
+        {
+          "id": "terra_diver:incomplete_drill_module"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "terra_diver:incomplete_drill_module"
+        },
+        {
+          "item": "create:shaft"
+        }
+      ],
+      "results": [
+        {
+          "id": "terra_diver:incomplete_drill_module"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "terra_diver:incomplete_drill_module"
+        },
+        {
+          "item": "create:sand_paper"
+        }
+      ],
+      "results": [
+        {
+          "id": "terra_diver:incomplete_drill_module"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "terra_diver:incomplete_drill_module"
+        },
+        {
+          "item": "create:brass_nugget"
+        }
+      ],
+      "results": [
+        {
+          "id": "terra_diver:incomplete_drill_module"
+        }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        {
+          "item": "terra_diver:incomplete_drill_module"
+        }
+      ],
+      "results": [
+        {
+          "id": "terra_diver:incomplete_drill_module"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "terra_diver:incomplete_drill_module"
+  }
+}
