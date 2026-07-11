@@ -9,6 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import com.example.terradiver.registry.BlockRegistry;
 
 /*
  * Сборка/разборка мультиблок-короны — общая логика мастера и дочерних ячеек. Разборка защищена
@@ -34,6 +35,32 @@ public final class DrillCrownMultiblock {
 
     public static boolean isDissolving() {
         return DISSOLVING.get();
+    }
+
+    /*
+     * Построить дочерние ячейки вокруг мастера. Вызывается при ЛЮБОЙ установке мастера — и игроком
+     * (через предмет), и при разборке контраптии Create (мастер ставится обратно в мир через setBlock,
+     * что дёргает onPlace). Раньше это жило только в предмете, поэтому после разборки контраптии
+     * дочерние блоки не восстанавливались — теперь восстанавливаются. Ставим принудительно: место
+     * под короной — её собственное (при установке предметом оно уже проверено на заменяемость).
+     */
+    public static void buildParts(Level level, BlockPos masterPos, String size, Direction facing) {
+        if (level.isClientSide) {
+            return;
+        }
+        Block partBlock = BlockRegistry.DRILL_CROWN_PART.get();
+        for (int[] off : DrillCrownStructure.cells(size)) {
+            int[] r = DrillCrownStructure.rotate(off, facing);
+            BlockPos cell = masterPos.offset(r[0], r[1], r[2]);
+            if (cell.equals(masterPos)) {
+                continue;
+            }
+            level.setBlock(cell, partBlock.defaultBlockState(), Block.UPDATE_ALL);
+            if (level.getBlockEntity(cell) instanceof DrillCrownPartBlockEntity be) {
+                be.setMaster(masterPos);
+                be.setShapeData(size, off[0], off[1], off[2], facing);
+            }
+        }
     }
 
     /*

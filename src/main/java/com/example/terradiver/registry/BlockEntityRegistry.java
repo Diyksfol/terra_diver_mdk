@@ -20,7 +20,9 @@ public class BlockEntityRegistry {
     // Один тип BE на оба подшипника (андезитовый и прочный) — логика одинаковая.
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrownBearingBlockEntity>> CROWN_BEARING =
         BLOCK_ENTITIES.register("crown_bearing",
-                () -> BlockEntityType.Builder.of(CrownBearingBlockEntity::new,
+                () -> BlockEntityType.Builder.<CrownBearingBlockEntity>of(
+                        (pos, state) -> new CrownBearingBlockEntity(
+                                BlockEntityRegistry.CROWN_BEARING.get(), pos, state),
                         BlockRegistry.CROWN_BEARING_ANDESITE.get(),
                         BlockRegistry.CROWN_BEARING_STURDY.get()).build(null));
 }

@@ -1,0 +1,29 @@
+{
+  "variants": {
+    "facing=up": {
+      "model": "terra_diver:block/crown_bearing_andesite"
+    },
+    "facing=down": {
+      "model": "terra_diver:block/crown_bearing_andesite",
+      "x": 180
+    },
+    "facing=north": {
+      "model": "terra_diver:block/crown_bearing_andesite",
+      "x": 270
+    },
+    "facing=south": {
+      "model": "terra_diver:block/crown_bearing_andesite",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "terra_diver:block/crown_bearing_andesite",
+      "x": 90,
+      "y": 270
+    },
+    "facing=west": {
+      "model": "terra_diver:block/crown_bearing_andesite",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

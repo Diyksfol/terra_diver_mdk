@@ -109,6 +109,17 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         return state.getValue(FACING);
     }
 
+    // Ставят мастера (игроком ИЛИ при разборке контраптии Create — она кладёт блок через setBlock)
+    // → строим дочерние ячейки. Раньше это делал только предмет, поэтому после разборки контраптии
+    // ведомые не возвращались. Теперь возвращаются.
+    @Override
+    public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
+        super.onPlace(state, level, pos, oldState, isMoving);
+        if (!level.isClientSide && !state.is(oldState.getBlock()) && !"1x1".equals(crownSize())) {
+            DrillCrownMultiblock.buildParts(level, pos, crownSize(), state.getValue(FACING));
+        }
+    }
+
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
         // Сломали мастера → снести всю структуру (флаг DISSOLVING гасит рекурсию).

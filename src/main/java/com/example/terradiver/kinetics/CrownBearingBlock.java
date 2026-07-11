@@ -1,60 +1,31 @@
 package com.example.terradiver.kinetics;
 
 import com.example.terradiver.registry.BlockEntityRegistry;
-import com.simibubi.create.content.kinetics.base.DirectionalKineticBlock;
-import com.simibubi.create.foundation.block.IBE;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.Block;
+import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlock;
+import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
 
 /*
- * Буровой подшипник — кинетический блок Create. Вал подключается СЗАДИ (со стороны, противоположной
- * лицевой), спереди на нём висит буровая корона. Нагрузка (SU) считается в подшипнике по размеру
- * прикреплённой короны — см. CrownBearingBlockEntity. Ось вращения = ось лицевой стороны.
+ * Буровой подшипник. Наследуемся от механического подшипника Create — оттуда бесплатно приезжают:
+ *  - ПКМ пустой рукой: собрать/разобрать контраптию перед лицом (корону);
+ *  - вращается ТОЛЬКО когда собрано (без короны собирать нечего → не крутится вхолостую);
+ *  - ключ (wrench) разбирает; вращение собранной короны перед неподвижным корпусом (как у Aeronautics).
+ * FACING, ось вращения, приём вала с тыла, ПКМ-обработчик — уже в родителе, не трогаем.
+ * Отличия (требование короны + нагрузка по её размеру) — в CrownBearingBlockEntity.
  *
- * Наследуем DirectionalKineticBlock: он уже даёт свойство FACING, установку по взгляду игрока и
- * базовую кинетическую обвязку. IBE связывает блок с его BlockEntity (аналог EntityBlock у Create).
+ * IBE<...> заново НЕ объявляем: родитель уже IBE<MechanicalBearingBlockEntity>, а тот же generic-
+ * интерфейс дважды с разными параметрами Java не разрешает. Достаточно переопределить тип BE —
+ * wildcard "? extends MechanicalBearingBlockEntity" принимает наш подтип. getBlockEntityClass()
+ * наследуем (вернёт MechanicalBearingBlockEntity.class; наш BE — его подкласс, проверки проходят).
  */
-public class CrownBearingBlock extends DirectionalKineticBlock implements IBE<CrownBearingBlockEntity> {
+public class CrownBearingBlock extends MechanicalBearingBlock {
 
     public CrownBearingBlock(Properties properties) {
         super(properties);
     }
 
-    // Ось вращения совпадает с осью, вдоль которой смотрит подшипник.
     @Override
-    public Axis getRotationAxis(BlockState state) {
-        return state.getValue(FACING).getAxis();
-    }
-
-    // Вал принимаем только с тыльной стороны: спереди место занято короной.
-    @Override
-    public boolean hasShaftTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
-        return face == state.getValue(FACING).getOpposite();
-    }
-
-    // Корону поставили/сломали рядом — пересчитать нагрузку сети.
-    @Override
-    public void neighborChanged(BlockState state, Level level, BlockPos pos, Block block,
-                                BlockPos fromPos, boolean isMoving) {
-        super.neighborChanged(state, level, pos, block, fromPos, isMoving);
-        if (!level.isClientSide) {
-            withBlockEntityDo(level, pos, CrownBearingBlockEntity::refreshStress);
-        }
-    }
-
-    @Override
-    public Class<CrownBearingBlockEntity> getBlockEntityClass() {
-        return CrownBearingBlockEntity.class;
-    }
-
-    @Override
-    public BlockEntityType<? extends CrownBearingBlockEntity> getBlockEntityType() {
+    public BlockEntityType<? extends MechanicalBearingBlockEntity> getBlockEntityType() {
         return BlockEntityRegistry.CROWN_BEARING.get();
     }
 }

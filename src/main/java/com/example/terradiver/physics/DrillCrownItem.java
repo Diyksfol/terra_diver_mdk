@@ -60,22 +60,7 @@ public class DrillCrownItem extends BlockItem {
         if (!level.isClientSide) {
             BlockState masterState = master.defaultBlockState().setValue(DrillCrownBlock.FACING, facing);
             level.setBlock(masterPos, masterState, Block.UPDATE_ALL);
-
-            Block partBlock = BlockRegistry.DRILL_CROWN_PART.get();
-            String size = master.crownSize();
-            for (int[] off : DrillCrownStructure.cells(size)) {
-                int[] r = DrillCrownStructure.rotate(off, facing);
-                BlockPos cell = masterPos.offset(r[0], r[1], r[2]);
-                if (cell.equals(masterPos)) {
-                    continue;
-                }
-                level.setBlock(cell, partBlock.defaultBlockState(), Block.UPDATE_ALL);
-                if (level.getBlockEntity(cell) instanceof DrillCrownPartBlockEntity be) {
-                    be.setMaster(masterPos);
-                    be.setShapeData(size, off[0], off[1], off[2], facing);
-                }
-            }
-
+            // Дочерние ячейки строит onPlace мастера (общая точка для игрока и разборки контраптии).
             if (context.getPlayer() == null || !context.getPlayer().getAbilities().instabuild) {
                 context.getItemInHand().shrink(1);
             }
