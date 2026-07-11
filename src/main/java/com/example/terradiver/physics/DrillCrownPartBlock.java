@@ -125,8 +125,9 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
         // Сломали часть → снести всю структуру. Флаг DISSOLVING в helper гасит рекурсию,
-        // когда разборка сама удаляет остальные ячейки.
-        if (!state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
+        // когда разборка сама удаляет остальные ячейки. При moved=true ведомую забирает контраптия
+        // Create (захват всей короны) — сносить структуру НЕ надо.
+        if (!moved && !state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
             if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
                 BlockState ms = level.getBlockState(be.getMaster());
                 if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {

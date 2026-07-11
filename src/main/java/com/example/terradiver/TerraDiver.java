@@ -10,6 +10,7 @@ import com.example.terradiver.registry.ItemRegistry;
 import com.mojang.logging.LogUtils;
 
 import net.neoforged.api.distmarker.Dist;
+import com.simibubi.create.api.contraption.BlockMovementChecks;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -42,6 +43,28 @@ public class TerraDiver {
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         LOGGER.info("Terra Diver mod loaded!");
+        event.enqueueWork(TerraDiver::registerContraptionAttachment);
+    }
+
+    // Короны (мастер + ведомые) должны ехать в контраптии Create единым целым: тогда бур вращается/
+    // двигается полностью и сталкивается с СУЩНОСТЯМИ (ContraptionCollider берёт коллизию блоков).
+    // «Прозрачность к БЛОКАМ» (проход сквозь породу) — это слой ДВИЖЕНИЯ (Sable/погружение), а не
+    // форма коллизии, поэтому здесь его не трогаем. Тут только «склеиваем» короны между собой, чтобы
+    // подшипник захватывал всю корону, а не один мастер (иначе ведомые не сталкиваются с сущностями).
+    private static void registerContraptionAttachment() {
+        BlockMovementChecks.registerAttachedCheck((state, world, pos, direction) -> {
+            if (isCrown(state) && isCrown(world.getBlockState(pos.relative(direction)))) {
+                return BlockMovementChecks.CheckResult.SUCCESS;
+            }
+            return BlockMovementChecks.CheckResult.PASS;
+        });
+        BlockMovementChecks.registerMovementNecessaryCheck((state, world, pos) ->
+                isCrown(state) ? BlockMovementChecks.CheckResult.SUCCESS : BlockMovementChecks.CheckResult.PASS);
+    }
+
+    private static boolean isCrown(net.minecraft.world.level.block.state.BlockState state) {
+        return state.getBlock() instanceof com.example.terradiver.physics.DrillCrownBlock
+                || state.getBlock() instanceof com.example.terradiver.physics.DrillCrownPartBlock;
     }
 
     @SubscribeEvent
