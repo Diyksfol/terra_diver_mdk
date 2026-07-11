@@ -2,6 +2,8 @@ package com.example.terradiver.kinetics;
 
 import com.example.terradiver.physics.DrillCrownBlock;
 import com.example.terradiver.physics.DrillCrownPartBlock;
+import com.example.terradiver.physics.DrillCrownPartBlockEntity;
+import com.example.terradiver.physics.DrillCrownStructure;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -130,7 +132,9 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         }
         tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing.title")
                 .withStyle(net.minecraft.ChatFormatting.GOLD));
-        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing")
+        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing.line1")
+                .withStyle(net.minecraft.ChatFormatting.GRAY));
+        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing.line2")
                 .withStyle(net.minecraft.ChatFormatting.GRAY));
         return true;
     }
@@ -142,6 +146,50 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
             return; // нет короны — крутить нечего, подшипник остаётся стоять
         }
         super.assemble();
+    }
+
+    // При остановке Create возвращает ведомые в мир, повернув их ПОЗИЦИИ к ближайшим 90°, но их
+    // сохранённые данные формы (ox,oy,oz/facing) едут с блоком как есть — суб-воксельный октант
+    // остаётся «от старого угла». На симметричном диске ячейка после поворота попадает в валидную
+    // позицию, но форма там от ДРУГОЙ ячейки, и коллизия перестаёт совпадать с моделью (заметно на
+    // повороте 180°: ячейки на месте, но форма не повёрнута). Мастер рисует модель в исходной
+    // ориентации (rotate не переопределён), поэтому после разборки переставляем данные формы всех
+    // ведомых обратно к КАНОНИЧЕСКОЙ раскладке при текущем facing мастера — тогда коллизия снова
+    // совпадает с моделью. Форма остаётся точной (октанты), полными кубами не подменяем.
+    // super.disassemble() пишет блоки в мир синхронно (addBlocksToWorld), так что к этому моменту
+    // корона уже стоит и мастер находится на оси перед лицом.
+    @Override
+    public void disassemble() {
+        boolean wasAssembled = running || movedContraption != null;
+        super.disassemble();
+        if (wasAssembled && level != null && !level.isClientSide) {
+            restampCrownShapes();
+        }
+    }
+
+    // Перештамповать данные формы ведомых по фактической геометрии короны перед лицом.
+    private void restampCrownShapes() {
+        BlockState self = getBlockState();
+        if (!(self.getBlock() instanceof CrownBearingBlock)) {
+            return;
+        }
+        BlockPos masterPos = worldPosition.relative(self.getValue(CrownBearingBlock.FACING));
+        BlockState ms = level.getBlockState(masterPos);
+        if (!(ms.getBlock() instanceof DrillCrownBlock crown)) {
+            return;
+        }
+        String size = crown.crownSize();
+        Direction crownFacing = ms.getValue(DrillCrownBlock.FACING);
+        int[][] cells = DrillCrownStructure.cells(size);
+        java.util.List<BlockPos> world = DrillCrownStructure.worldCells(size, crownFacing, masterPos);
+        // Индекс 0 — мастер (своя форма). Ведомые: мировая ячейка world[i] <-> модельная cells[i].
+        for (int i = 1; i < cells.length; i++) {
+            if (level.getBlockEntity(world.get(i)) instanceof DrillCrownPartBlockEntity be) {
+                int[] off = cells[i];
+                be.setMaster(masterPos);
+                be.setShapeData(size, off[0], off[1], off[2], crownFacing);
+            }
+        }
     }
 
     // Сторона короны (мастер-блока) прямо перед лицом подшипника; 0 — если короны нет.

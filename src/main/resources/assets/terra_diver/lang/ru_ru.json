@@ -35,5 +35,6 @@
   "itemGroup.terra_diver.terra_diver_tab": "Terra Diver",
   "tooltip.terra_diver.crown_bearing": "Сборка бура: поставьте перед подшипником хотя бы одну корону и кликните по нему ПКМ пустой рукой.",
   "hint.terra_diver.crown_bearing.title": "Сборка бура",
-  "hint.terra_diver.crown_bearing": "ПКМ пустой рукой. Нужна хотя бы одна корона перед подшипником."
+  "hint.terra_diver.crown_bearing.line1": "ПКМ пустой рукой. Нужна",
+  "hint.terra_diver.crown_bearing.line2": "хотя бы одна корона перед подшипником."
 }

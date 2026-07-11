@@ -127,6 +127,11 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         if (!isMoving && !level.isClientSide && !state.is(oldState.getBlock()) && !"1x1".equals(crownSize())) {
             DrillCrownMultiblock.buildParts(level, pos, crownSize(), state.getValue(FACING));
         }
+        // На клиенте гасим залипший прогресс ломания (трещины) на всех ячейках короны — иначе
+        // переустановленный на то же место бур появляется «с трещинами» от прошлой добычи.
+        if (level.isClientSide && !state.is(oldState.getBlock())) {
+            com.example.terradiver.client.ClientCrownEffects.clearBreakProgress(pos, crownSize(), state.getValue(FACING));
+        }
     }
 
     @Override

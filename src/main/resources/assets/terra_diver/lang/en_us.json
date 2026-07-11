@@ -35,5 +35,6 @@
   "itemGroup.terra_diver.terra_diver_tab": "Terra Diver",
   "tooltip.terra_diver.crown_bearing": "Assemble a drill: place at least one crown in front of the bearing and right-click it with an empty hand.",
   "hint.terra_diver.crown_bearing.title": "Assemble Drill",
-  "hint.terra_diver.crown_bearing": "Right-click with an empty hand. Needs at least one crown placed in front of the bearing."
+  "hint.terra_diver.crown_bearing.line1": "Right-click with an empty hand.",
+  "hint.terra_diver.crown_bearing.line2": "Needs at least one crown in front of the bearing."
 }

@@ -115,9 +115,19 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
     @Override
     public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
         // Сломали часть в выживании → выронить один предмет короны у мастера.
-        if (!level.isClientSide && !player.getAbilities().instabuild
-                && level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
-            DrillCrownMultiblock.dropCrownItem(level, be.getMaster());
+        if (!level.isClientSide && level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
+            if (!player.getAbilities().instabuild) {
+                DrillCrownMultiblock.dropCrownItem(level, be.getMaster());
+            }
+            // Сбросить прогресс ломания по всей короне (для остальных игроков; локальному — гасим при
+            // установке, см. DrillCrownBlock.onPlace). Ведомые видны как коллизия по краям, поэтому
+            // ломают часто именно их.
+            BlockState ms = level.getBlockState(be.getMaster());
+            if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {
+                for (BlockPos cell : DrillCrownStructure.worldCells(m.crownSize(), m.crownFacing(ms), be.getMaster())) {
+                    level.destroyBlockProgress(player.getId(), cell, -1);
+                }
+            }
         }
         return super.playerWillDestroy(level, pos, state, player);
     }
