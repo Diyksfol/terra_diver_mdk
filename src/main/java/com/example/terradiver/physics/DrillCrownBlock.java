@@ -64,6 +64,13 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         if (!level.isClientSide && !player.getAbilities().instabuild) {
             DrillCrownMultiblock.dropCrownItem(level, pos);
         }
+        // Сбросить прогресс ломания по ВСЕМ ячейкам короны, иначе при повторной установке на то же
+        // место блок появляется «с трещинами» (клиент держит старый прогресс до первого ЛКМ).
+        if (!level.isClientSide) {
+            for (BlockPos cell : DrillCrownStructure.worldCells(crownSize(), state.getValue(FACING), pos)) {
+                level.destroyBlockProgress(player.getId(), cell, -1);
+            }
+        }
         return super.playerWillDestroy(level, pos, state, player);
     }
 

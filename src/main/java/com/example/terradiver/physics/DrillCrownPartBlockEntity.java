@@ -27,6 +27,7 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
     private Direction facing = Direction.UP;
 
     private VoxelShape cachedShape; // ленивый кэш
+    private Direction cachedFacing;  // при какой ориентации собран кэш
 
     public DrillCrownPartBlockEntity(BlockPos pos, BlockState state) {
         super(BlockEntityRegistry.DRILL_CROWN_PART.get(), pos, state);
@@ -57,11 +58,27 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
     }
 
     public VoxelShape getShape() {
-        if (cachedShape == null) {
+        // Ориентацию берём ЖИВОЙ у мастера, а не только из сохранённого facing. Тогда при повороте
+        // короны на подшипнике (сборка/разборка под углом) и повторной установке форма коллизии
+        // поворачивается вместе с блоками, а не остаётся смотреть «как была» (эффект карусели).
+        Direction f = currentFacing();
+        if (cachedShape == null || f != cachedFacing) {
             cachedShape = CrownShapes.build(
-                DrillCrownStructure.cellShapeBoxes(size, ox, oy, oz), facing);
+                DrillCrownStructure.cellShapeBoxes(size, ox, oy, oz), f);
+            cachedFacing = f;
         }
         return cachedShape;
+    }
+
+    // Текущая сторона мастера (если он на месте), иначе — сохранённая при постройке.
+    private Direction currentFacing() {
+        if (level != null) {
+            BlockState ms = level.getBlockState(masterPos);
+            if (ms.getBlock() instanceof DrillCrownBlock) {
+                return ms.getValue(DrillCrownBlock.FACING);
+            }
+        }
+        return facing;
     }
 
     @Override

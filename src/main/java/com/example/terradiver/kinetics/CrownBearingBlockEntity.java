@@ -1,11 +1,13 @@
 package com.example.terradiver.kinetics;
 
 import com.example.terradiver.physics.DrillCrownBlock;
+import com.example.terradiver.physics.DrillCrownPartBlock;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
 
 /*
  * BlockEntity бурового подшипника. Берём всю сборку/разборку/вращение от механического подшипника
@@ -47,13 +49,90 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         };
     }
 
-    // Механический подшипник — это генератор скорости, но нагрузку он ПОТРЕБЛЯЕТ (impact). Отдаём
-    // нагрузку прикреплённой короны; нет короны → сборка не состоится, но подстрахуемся нулём.
+    // Нагрузку СУММИРУЕМ по ВСЕМ коронам, прикреплённым к подшипнику, как у подшипника Aeronautics.
+    // Когда собрано — короны уже в контраптии (в мире перед лицом их нет!), поэтому читаем их из
+    // контраптии; иначе (до сборки) — по короне в мире перед лицом. Это же чинит пропажу показа
+    // нагрузки в гогглах при вращении: раньше фронт был пустым (корона уехала) и выходил 0.
     @Override
     public float calculateStressApplied() {
-        float impact = stressForSide(frontCrownSide());
+        float impact = 0.0F;
+        if (movedContraption != null && movedContraption.getContraption() != null) {
+            for (StructureBlockInfo info : movedContraption.getContraption().getBlocks().values()) {
+                if (info.state().getBlock() instanceof DrillCrownBlock crown) {
+                    impact += stressForSide(sideOf(crown.crownSize()));
+                }
+            }
+        } else {
+            impact = worldCrownStress();
+        }
         this.lastStressApplied = impact;
         return impact;
+    }
+
+    // До сборки короны стоят в мире. Суммируем нагрузку ВСЕХ коронов связной структуры перед лицом
+    // (BFS по блокам короны — мастер+ведомые), а не только ближайшей. Так остановленный подшипник
+    // показывает ту же суммарную нагрузку, что и при вращении (стойка 3x3 + 1x1 = сумма обоих).
+    private float worldCrownStress() {
+        if (level == null) {
+            return 0.0F;
+        }
+        BlockState self = getBlockState();
+        if (!(self.getBlock() instanceof CrownBearingBlock)) {
+            return 0.0F;
+        }
+        Direction facing = self.getValue(CrownBearingBlock.FACING);
+        BlockPos start = worldPosition.relative(facing);
+        if (!isCrown(level.getBlockState(start))) {
+            return 0.0F;
+        }
+        java.util.Set<BlockPos> seen = new java.util.HashSet<>();
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        queue.add(start);
+        seen.add(start);
+        float sum = 0.0F;
+        int cap = 4096; // страховка от разрастания
+        while (!queue.isEmpty() && cap-- > 0) {
+            BlockPos p = queue.poll();
+            BlockState st = level.getBlockState(p);
+            if (st.getBlock() instanceof DrillCrownBlock crown) {
+                sum += stressForSide(sideOf(crown.crownSize()));
+            }
+            for (Direction d : Direction.values()) {
+                BlockPos n = p.relative(d);
+                if (seen.add(n) && isCrown(level.getBlockState(n))) {
+                    queue.add(n);
+                }
+            }
+        }
+        return sum;
+    }
+
+    private static boolean isCrown(BlockState state) {
+        return state.getBlock() instanceof DrillCrownBlock
+                || state.getBlock() instanceof DrillCrownPartBlock;
+    }
+
+    // Полностью прячем create-хинт "empty_bearing" ("Активировать подшипник...") и ставим свой.
+    // Родителя НЕ зовём (иначе он добавит create-хинт). Показ нагрузки в гогглах идёт отдельным
+    // методом (addToGoggleTooltip) и здесь не затрагивается; опускается лишь overstress-хинт.
+    @Override
+    public boolean addToTooltip(java.util.List<net.minecraft.network.chat.Component> tooltip, boolean isPlayerSneaking) {
+        if (running || level == null) {
+            return false;
+        }
+        BlockState state = getBlockState();
+        if (!(state.getBlock() instanceof CrownBearingBlock)) {
+            return false;
+        }
+        BlockState front = level.getBlockState(worldPosition.relative(state.getValue(CrownBearingBlock.FACING)));
+        if (front.canBeReplaced()) {
+            return false;
+        }
+        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing.title")
+                .withStyle(net.minecraft.ChatFormatting.GOLD));
+        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing")
+                .withStyle(net.minecraft.ChatFormatting.GRAY));
+        return true;
     }
 
     // Собирать разрешаем только когда перед лицом реально стоит корона.

@@ -32,5 +32,8 @@
   "item.terra_diver.piezo_element": "Пьезоэлемент",
   "item.terra_diver.drill_module": "Буровой модуль",
   "item.terra_diver.incomplete_drill_module": "Незаконченный буровой модуль",
-  "itemGroup.terra_diver.terra_diver_tab": "Terra Diver"
+  "itemGroup.terra_diver.terra_diver_tab": "Terra Diver",
+  "tooltip.terra_diver.crown_bearing": "Сборка бура: поставьте перед подшипником хотя бы одну корону и кликните по нему ПКМ пустой рукой.",
+  "hint.terra_diver.crown_bearing.title": "Сборка бура",
+  "hint.terra_diver.crown_bearing": "ПКМ пустой рукой. Нужна хотя бы одна корона перед подшипником."
 }

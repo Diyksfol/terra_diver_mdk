@@ -8,6 +8,8 @@ import com.example.terradiver.physics.DrillCrownBlock;
 import com.example.terradiver.kinetics.CrownBearingBlock;
 import com.example.terradiver.physics.DrillCrownPartBlock;
 
+import net.minecraft.world.level.material.PushReaction;
+
 public class BlockRegistry {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks("terra_diver");
 
@@ -22,7 +24,7 @@ public class BlockRegistry {
     private static final int CROWN_GLOW = 4; // 0..15 - TUNE (0 = выкл.)
 
     private static Block.Properties masterProps() {
-        return props().noOcclusion().noLootTable().lightLevel(s -> CROWN_GLOW);
+        return props().noOcclusion().noLootTable().lightLevel(s -> CROWN_GLOW).pushReaction(PushReaction.BLOCK);
     }
 
     // ==================== DRILL CROWNS 1x1 (мастер мультиблока) ====================
@@ -88,7 +90,7 @@ public class BlockRegistry {
     // ==================== MULTIBLOCK PART (внутренний, невидимый) ====================
     public static final DeferredHolder<Block, DrillCrownPartBlock> DRILL_CROWN_PART =
             BLOCKS.register("drill_crown_part",
-                    () -> new DrillCrownPartBlock(props().noOcclusion().noLootTable()));
+                    () -> new DrillCrownPartBlock(props().noOcclusion().noLootTable().pushReaction(PushReaction.BLOCK)));
 
     // ==================== OTHER BLOCKS ====================
     public static final DeferredHolder<Block, Block> CROWN_BEARING_ANDESITE =

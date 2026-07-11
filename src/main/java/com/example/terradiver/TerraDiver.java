@@ -60,6 +60,11 @@ public class TerraDiver {
         });
         BlockMovementChecks.registerMovementNecessaryCheck((state, world, pos) ->
                 isCrown(state) ? BlockMovementChecks.CheckResult.SUCCESS : BlockMovementChecks.CheckResult.PASS);
+        // Короны помечены PushReaction.BLOCK (чтобы ванильный поршень не выдёргивал мастер и не рвал
+        // структуру, см. пункт про липкий поршень). Но контраптиям Create двигать корону МОЖНО —
+        // явно разрешаем, иначе PushReaction.BLOCK заодно запретил бы и подшипнику её собирать.
+        BlockMovementChecks.registerMovementAllowedCheck((state, world, pos) ->
+                isCrown(state) ? BlockMovementChecks.CheckResult.SUCCESS : BlockMovementChecks.CheckResult.PASS);
     }
 
     private static boolean isCrown(net.minecraft.world.level.block.state.BlockState state) {
