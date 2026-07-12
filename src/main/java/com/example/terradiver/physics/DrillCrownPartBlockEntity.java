@@ -102,6 +102,11 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
             loadAdditional(tag, registries);
         }
         cachedShape = null; // пересобрать форму с новыми данными
+        // Клиент узнал о ячейке короны → это НАДЁЖНЫЙ клиентский триггер (в отличие от onPlace,
+        // который при блок-апдейте с сервера может не вызываться). Просим погасить залипший прогресс
+        // ломания у локального игрока на несколько тиков — иначе переустановленный бур появляется «с
+        // трещинами» от прошлой добычи. См. ClientCrownEffects.
+        com.example.terradiver.client.ClientCrownEffects.requestClear();
     }
 
     @Override

@@ -2,9 +2,13 @@ package com.example.terradiver.physics;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -56,6 +60,23 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         Direction face = context.getClickedFace();
         Direction facing = context.isSecondaryUseActive() ? face.getOpposite() : face;
         return defaultBlockState().setValue(FACING, facing);
+    }
+
+    // Когда корону двигает/поворачивает механика Create (разборка контраптии, склейка слизью,
+    // физштуковина), Create зовёт state.rotate/mirror на каждом блоке. Раньше мы это не
+    // переопределяли, поэтому FACING мастера не менялся, модель смотрела «как была», а данные
+    // ведомых расходились с ней. Теперь FACING поворачивается вместе со структурой. Внимание:
+    // vanilla Rotation — только вокруг вертикали (Y). Повороты вокруг горизонтальной оси (подшипник
+    // смотрит вбок, физштуковина кренится) сюда не приходят готовым Rotation — их отрабатывает уже
+    // самолечение ведомых по факту (см. DrillCrownMultiblock.restampParts) + вопрос к проверке.
+    @Override
+    public BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    public BlockState mirror(BlockState state, Mirror mirror) {
+        return state.setValue(FACING, mirror.mirror(state.getValue(FACING)));
     }
 
     @Override
@@ -116,6 +137,16 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         return state.getValue(FACING);
     }
 
+    // Отложенная перештамповка ведомых после того, как мастера вернула чужая механика (см. onPlace,
+    // ветка isMoving). Читаем ЖИВОЕ состояние: между планированием и тиком блок мог смениться.
+    @Override
+    public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+        BlockState now = level.getBlockState(pos);
+        if (now.getBlock() instanceof DrillCrownBlock crown && !"1x1".equals(crown.crownSize())) {
+            DrillCrownMultiblock.restampParts(level, pos, crown.crownSize(), now.getValue(FACING));
+        }
+    }
+
     // Ставят мастера (игроком ИЛИ при разборке контраптии Create — она кладёт блок через setBlock)
     // → строим дочерние ячейки. Раньше это делал только предмет, поэтому после разборки контраптии
     // ведомые не возвращались. Теперь возвращаются.
@@ -126,6 +157,13 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         // разборка контраптии Create — она же вернёт захваченные ведомые сама, дублировать не нужно.
         if (!isMoving && !level.isClientSide && !state.is(oldState.getBlock()) && !"1x1".equals(crownSize())) {
             DrillCrownMultiblock.buildParts(level, pos, crownSize(), state.getValue(FACING));
+        }
+        // Мастера вернула ЧУЖАЯ механика (разборка контраптии/склейка слизью/физштуковина): ведомые
+        // Create уже вернул сам, но их сохранённые данные (masterPos/смещение) устарели. Планируем
+        // перештамповку на следующий тик, когда вся структура точно на месте (порядок установки
+        // блоков при разборке не гарантирован, поэтому не сразу). См. DrillCrownMultiblock.restampParts.
+        if (isMoving && !level.isClientSide && !state.is(oldState.getBlock()) && !"1x1".equals(crownSize())) {
+            level.scheduleTick(pos, this, 1);
         }
         // На клиенте гасим залипший прогресс ломания (трещины) на всех ячейках короны — иначе
         // переустановленный на то же место бур появляется «с трещинами» от прошлой добычи.

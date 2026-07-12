@@ -64,6 +64,33 @@ public final class DrillCrownMultiblock {
     }
 
     /*
+     * Перештамповать данные уже стоящих ведомых — БЕЗ установки новых блоков. Нужно после того, как
+     * корону подвинула/повернула ЧУЖАЯ механика (склейка слизью, чужая контраптия, физштуковина):
+     * сами блоки Create вернул в мир, но их сохранённые данные устарели — абсолютный masterPos
+     * указывает на старое место, а смещение/facing могут не соответствовать новой ориентации. Идём
+     * по канонической раскладке при ТЕКУЩЕМ facing мастера и переписываем каждой ведомой корректные
+     * master + форму. Для чистого переноса (facing не менялся) это чинит «кривого мастера» из-за
+     * устаревшего masterPos. Для поворота — при условии, что facing мастера уже верен (см. rotate()
+     * в DrillCrownBlock) и Create вернул ведомые в предсказанные позиции. Идемпотентно.
+     */
+    public static void restampParts(Level level, BlockPos masterPos, String size, Direction facing) {
+        if (level.isClientSide) {
+            return;
+        }
+        for (int[] off : DrillCrownStructure.cells(size)) {
+            int[] r = DrillCrownStructure.rotate(off, facing);
+            BlockPos cell = masterPos.offset(r[0], r[1], r[2]);
+            if (cell.equals(masterPos)) {
+                continue;
+            }
+            if (level.getBlockEntity(cell) instanceof DrillCrownPartBlockEntity be) {
+                be.setMaster(masterPos);
+                be.setShapeData(size, off[0], off[1], off[2], facing);
+            }
+        }
+    }
+
+    /*
      * Снести всю структуру: размер и направление заданы явно (надёжно и при сломе мастера, когда
      * его уже нет в мире). Идемпотентно: флаг DISSOLVING гасит повторный вход во время разборки.
      */
