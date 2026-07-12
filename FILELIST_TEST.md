@@ -1,11 +1,12 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-07-11 08:01 UTC_
+_Обновлён: 2026-07-11 12:58 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
 - [src/main/java/com/example/terradiver/TerraDiver.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/TerraDiver.java)
 - [src/main/java/com/example/terradiver/block/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/block/package-info.java)
 - [src/main/java/com/example/terradiver/blockentity/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/blockentity/package-info.java)
+- [src/main/java/com/example/terradiver/client/ClientCrownEffects.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/ClientCrownEffects.java)
 - [src/main/java/com/example/terradiver/client/ClientEvents.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/ClientEvents.java)
 - [src/main/java/com/example/terradiver/client/DrillClientExtensions.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/DrillClientExtensions.java)
 - [src/main/java/com/example/terradiver/client/DrillOffhandLock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/client/DrillOffhandLock.java)
