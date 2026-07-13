@@ -32,7 +32,6 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
     private static final float SPEED_FACTOR = 0.25F; // визуальная скорость = RPM/4
     private static final int RAMP_TICKS = 30;        // ~1.5с на разгон/торможение при ЛЮБОЙ скорости
     private float easedAngularSpeed = 0.0F;
-    private boolean spinningDown = false;            // запрошена разборка — сперва плавно докрутить
 
     @Override
     public float getAngularSpeed() {
@@ -41,18 +40,16 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
 
     @Override
     public void tick() {
-        // Шаг ПРОПОРЦИОНАЛЕН скорости, поэтому разгон/торможение занимают ~RAMP_TICKS тиков при любой
-        // скорости (прошлый фикс. шаг при низких RPM делал ramp мгновенным — отсюда «нет ускорения»).
-        // angle двигает super.tick() по нашему getAngularSpeed(), значит визуал и физика идут вместе.
-        float target = spinningDown ? 0.0F : SPEED_FACTOR * super.getAngularSpeed();
+        // Плавная угловая скорость (RPM/4). Шаг пропорционален скорости → разгон/торможение ~RAMP_TICKS
+        // тиков при любой скорости. КЛЮЧЕВОЕ: разгоняем ТОЛЬКО когда СОБРАНО (running). Иначе eased
+        // раскручивался ещё до сборки (вал крутится вхолостую), и корона стартовала сразу на максимуме —
+        // отсюда «нет разгона». Пока не собрано — держим 0; после сборки плавно поднимаемся ОТ 0; при
+        // снятии оборотов — плавно опускаемся (в покое корона докручивается на месте). angle двигает
+        // super.tick() по нашему getAngularSpeed(), поэтому визуал и физика идут вместе.
+        float target = running ? SPEED_FACTOR * super.getAngularSpeed() : 0.0F;
         float ref = Math.max(Math.abs(target), Math.abs(easedAngularSpeed));
         float step = ref / RAMP_TICKS + 0.02F;
         easedAngularSpeed = Mth.approach(easedAngularSpeed, target, step);
-        // Докрутили после запроса разборки → теперь действительно разбираем (в tick, не резко).
-        if (spinningDown && level != null && !level.isClientSide && Math.abs(easedAngularSpeed) <= 0.05F) {
-            disassemble();
-            return;
-        }
         super.tick();
     }
 
@@ -214,13 +211,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
     // (ControlledContraptionEntity.makeStructureTransform + AbstractContraptionEntity.disassemble).
     @Override
     public void disassemble() {
-        // Не разбираем резко: если корона ещё крутится — сперва плавно гасим (spinningDown), а сама
-        // разборка сработает в tick, когда скорость упадёт до ~0. Затем парковка в исходную ориентацию.
-        if (!spinningDown && movedContraption != null && Math.abs(easedAngularSpeed) > 0.05F) {
-            spinningDown = true;
-            return;
-        }
-        spinningDown = false;
+        // Паркуем прикреплённое в исходную ориентацию (крен/поворот в 0), затем штатно разбираем.
         if (movedContraption != null) {
             movedContraption.setAngle(0.0F);
         }

@@ -64,45 +64,6 @@ public final class DrillCrownMultiblock {
     }
 
     /*
-     * Перештамповать данные уже стоящих ведомых — БЕЗ установки новых блоков. Нужно после того, как
-     * корону подвинула/повернула ЧУЖАЯ механика (склейка слизью, чужая контраптия, физштуковина):
-     * сами блоки Create вернул в мир, но их сохранённые данные устарели — абсолютный masterPos
-     * указывает на старое место, а смещение/facing могут не соответствовать новой ориентации. Идём
-     * по канонической раскладке при ТЕКУЩЕМ facing мастера и переписываем каждой ведомой корректные
-     * master + форму. Для чистого переноса (facing не менялся) это чинит «кривого мастера» из-за
-     * устаревшего masterPos. Для поворота — при условии, что facing мастера уже верен (см. rotate()
-     * в DrillCrownBlock) и Create вернул ведомые в предсказанные позиции. Идемпотентно.
-     */
-    public static void restampParts(Level level, BlockPos masterPos, String size, Direction facing) {
-        if (level.isClientSide) {
-            return;
-        }
-        // Обходим СВЯЗНУЮ структуру короны от мастера (по соседним ячейкам короны) и всем ведомым
-        // чиним указатель на мастера. Форму и сторону ведомая берёт сама: сторону — живой у мастера,
-        // октант — по СВОЕМУ фактическому положению относительно мастера (см. getShape). Поэтому
-        // здесь достаточно поправить masterPos. BFS находит ведомых там, где они реально стоят,
-        // поэтому НЕ зависит от конвенции поворота чужой механики (Sable) — в отличие от прошлого
-        // перебора по предсказанным позициям, который при повороте их не находил.
-        java.util.Set<BlockPos> seen = new java.util.HashSet<>();
-        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
-        seen.add(masterPos);
-        queue.add(masterPos);
-        int cap = 4096;
-        while (!queue.isEmpty() && cap-- > 0) {
-            BlockPos p = queue.poll();
-            if (level.getBlockEntity(p) instanceof DrillCrownPartBlockEntity be) {
-                be.setMaster(masterPos);
-            }
-            for (Direction d : Direction.values()) {
-                BlockPos n = p.relative(d);
-                if (seen.add(n) && isCrownCell(level.getBlockState(n))) {
-                    queue.add(n);
-                }
-            }
-        }
-    }
-
-    /*
      * Снести всю структуру: размер и направление заданы явно (надёжно и при сломе мастера, когда
      * его уже нет в мире). Идемпотентно: флаг DISSOLVING гасит повторный вход во время разборки.
      */

@@ -211,3 +211,20 @@ idea {
         downloadJavadoc = true
     }
 }
+
+// ── Копирование собранного jar мода в папку модов Minecraft (Terra Diver) ──
+// После `gradlew build` готовый jar кладётся в папку инстанса CurseForge с заменой, чтобы не таскать
+// файл вручную. Путь с пробелом ("Games A") — через ПРЯМЫЕ слэши (в Groovy backslash — это escape).
+// Если папка на другой машине отличается — поменять minecraftModsDir ниже.
+def minecraftModsDir = 'A:/Games A/CurseForge/MODS/Instances/CA-test/mods'
+tasks.register('copyModToMinecraft', Copy) {
+    dependsOn tasks.named('jar')
+    from tasks.named('jar').flatMap { it.archiveFile }
+    into minecraftModsDir
+    doLast {
+        println "Terra Diver: jar скопирован в ${minecraftModsDir}"
+    }
+}
+tasks.named('build') {
+    finalizedBy 'copyModToMinecraft'
+}

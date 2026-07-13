@@ -73,7 +73,7 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     // ведомых расходились с ней. Теперь FACING поворачивается вместе со структурой. Внимание:
     // vanilla Rotation — только вокруг вертикали (Y). Повороты вокруг горизонтальной оси (подшипник
     // смотрит вбок, физштуковина кренится) сюда не приходят готовым Rotation — их отрабатывает уже
-    // самолечение ведомых по факту (см. DrillCrownMultiblock.restampParts) + вопрос к проверке.
+    // самолечение ведомых: пересборка от мастера (см. DrillCrownMultiblock.buildParts) + вопрос к проверке.
     @Override
     public BlockState rotate(BlockState state, Rotation rotation) {
         Direction facing = state.getValue(FACING);
@@ -163,7 +163,11 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         BlockState now = level.getBlockState(pos);
         if (now.getBlock() instanceof DrillCrownBlock crown && !"1x1".equals(crown.crownSize())) {
-            DrillCrownMultiblock.restampParts(level, pos, crown.crownSize(), now.getValue(FACING));
+            // Мастер вернулся чужой механикой (Sable) с ВЕРНОЙ ориентацией, но ведомые могли поехать
+            // или побиться (октанты не те, часть заменилась полными блоками, недетерминизм). Раз мастер
+            // корректен — ПЕРЕСОБИРАЕМ ведомых от него с нуля: buildParts перезаписывает ячейки свежими
+            // блоками с правильными данными. Это надёжнее и детерминированнее починки по одной ячейке.
+            DrillCrownMultiblock.buildParts(level, pos, crown.crownSize(), now.getValue(FACING));
         }
     }
 
@@ -181,7 +185,7 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         // Мастера вернула ЧУЖАЯ механика (разборка контраптии/склейка слизью/физштуковина): ведомые
         // Create уже вернул сам, но их сохранённые данные (masterPos/смещение) устарели. Планируем
         // перештамповку на следующий тик, когда вся структура точно на месте (порядок установки
-        // блоков при разборке не гарантирован, поэтому не сразу). См. DrillCrownMultiblock.restampParts.
+        // блоков при разборке не гарантирован, поэтому не сразу). Пересобираем от мастера (buildParts).
         if (isMoving && !level.isClientSide && !state.is(oldState.getBlock()) && !"1x1".equals(crownSize())) {
             level.scheduleTick(pos, this, 1);
         }
