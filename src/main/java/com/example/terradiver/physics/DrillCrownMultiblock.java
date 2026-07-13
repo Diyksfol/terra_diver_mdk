@@ -77,6 +77,7 @@ public final class DrillCrownMultiblock {
         if (level.isClientSide) {
             return;
         }
+        int stamped = 0; // ВРЕМЕННО (#3): сколько ведомых реально нашли и перештамповали
         for (int[] off : DrillCrownStructure.cells(size)) {
             int[] r = DrillCrownStructure.rotate(off, facing);
             BlockPos cell = masterPos.offset(r[0], r[1], r[2]);
@@ -86,8 +87,12 @@ public final class DrillCrownMultiblock {
             if (level.getBlockEntity(cell) instanceof DrillCrownPartBlockEntity be) {
                 be.setMaster(masterPos);
                 be.setShapeData(size, off[0], off[1], off[2], facing);
+                stamped++;
             }
         }
+        org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
+                "[TD-heal] restampParts @ {} facing {} size {}: перештамповано {} из {} ведомых",
+                masterPos, facing, size, stamped, DrillCrownStructure.cells(size).length - 1);
     }
 
     /*

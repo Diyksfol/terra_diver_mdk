@@ -125,41 +125,36 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
 
     // Показ НАГРУЗКИ в очках. Наследуемый метод Create прячет строку при нагрузке 0 (return false),
     // а нам нужно, чтобы буровой подшипник, как и обычный, показывал нагрузку ВСЕГДА — даже 0.
-    // Поэтому переопределяем и всегда рисуем «kinetic_stats» + импакт (через штатный addStressImpactStats).
+    // Здесь же (в очках, не в hover-описании) показываем свой хинт «нужна корона».
     @Override
     public boolean addToGoggleTooltip(java.util.List<net.minecraft.network.chat.Component> tooltip, boolean isPlayerSneaking) {
         if (!StressImpact.isEnabled()) {
             return false;
         }
+        // gui.goggles.kinetic_stats — ключ САМОГО Create, для него CreateLang.translate корректен.
         CreateLang.translate("gui.goggles.kinetic_stats").forGoggles(tooltip);
         addStressImpactStats(tooltip, calculateStressApplied());
+        // Хинт «нужна корона» — только когда НЕ собрано и короны перед лицом нет.
+        // ВАЖНО: наши ключи добавляем через builder().add(Component.translatable(...)), а НЕ через
+        // CreateLang.translate(...) — тот подставляет префикс "create." и ключ не находится (из-за
+        // этого показывались имена переменных). forGoggles даёт правильный отступ.
+        if (!running && frontCrownSide() <= 0 && getBlockState().getBlock() instanceof CrownBearingBlock) {
+            CreateLang.builder().add(net.minecraft.network.chat.Component
+                    .translatable("hint.terra_diver.crown_bearing.title").withStyle(net.minecraft.ChatFormatting.GOLD)).forGoggles(tooltip);
+            CreateLang.builder().add(net.minecraft.network.chat.Component
+                    .translatable("hint.terra_diver.crown_bearing.line1").withStyle(net.minecraft.ChatFormatting.GRAY)).forGoggles(tooltip);
+            CreateLang.builder().add(net.minecraft.network.chat.Component
+                    .translatable("hint.terra_diver.crown_bearing.line2").withStyle(net.minecraft.ChatFormatting.GRAY)).forGoggles(tooltip);
+        }
         return true;
     }
 
-    // Наш hover-хинт «нужна корона». super НЕ зовём: у MechanicalBearing он вешает СТАНДАРТНЫЙ хинт
-    // empty_bearing, который мы специально прячем ради своего. Нагрузка сюда не относится — она идёт
-    // отдельным addToGoggleTooltip выше. Хинт добавляем через CreateLang.forGoggles — это даёт тот же
-    // ОТСТУП, что у штатных строк очков (иначе значок очков налезает на текст). Показываем только
-    // когда НЕ собрано и короны перед лицом нет.
+    // Обычный hover-хинт. Пусто и super НЕ зовём: у MechanicalBearing здесь вешается стандартный хинт
+    // empty_bearing, который мы прячем; а свою инфу показываем ТОЛЬКО в очках (addToGoggleTooltip),
+    // а не в hover-описании блока (раньше хинт по ошибке дублировался туда).
     @Override
     public boolean addToTooltip(java.util.List<net.minecraft.network.chat.Component> tooltip, boolean isPlayerSneaking) {
-        if (running || level == null || isPlayerSneaking) {
-            return false;
-        }
-        BlockState state = getBlockState();
-        if (!(state.getBlock() instanceof CrownBearingBlock)) {
-            return false;
-        }
-        if (frontCrownSide() > 0) {
-            return false; // корона на месте — хинт не нужен
-        }
-        CreateLang.translate("hint.terra_diver.crown_bearing.title")
-                .style(net.minecraft.ChatFormatting.GOLD).forGoggles(tooltip);
-        CreateLang.translate("hint.terra_diver.crown_bearing.line1")
-                .style(net.minecraft.ChatFormatting.GRAY).forGoggles(tooltip);
-        CreateLang.translate("hint.terra_diver.crown_bearing.line2")
-                .style(net.minecraft.ChatFormatting.GRAY).forGoggles(tooltip);
-        return true;
+        return false;
     }
 
     // Собирать разрешаем только когда перед лицом реально стоит корона.
