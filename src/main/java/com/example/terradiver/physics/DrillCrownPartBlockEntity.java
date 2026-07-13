@@ -35,6 +35,7 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
 
     public void setMaster(BlockPos master) {
         this.masterPos = master;
+        this.cachedShape = null; // положение относительно мастера изменилось — форма пересоберётся
         setChanged();
     }
 
@@ -58,16 +59,28 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
     }
 
     public VoxelShape getShape() {
-        // Ориентацию берём ЖИВОЙ у мастера, а не только из сохранённого facing. Тогда при повороте
-        // короны на подшипнике (сборка/разборка под углом) и повторной установке форма коллизии
-        // поворачивается вместе с блоками, а не остаётся смотреть «как была» (эффект карусели).
+        // Форму ячейки строим по её ФАКТИЧЕСКОМУ положению относительно мастера, а не по сохранённому
+        // смещению: тогда после любого поворота/крена, наложенного чужой механикой (подшипник, Sable),
+        // октант тела вращения follows реальное положение и совпадает с повёрнутой моделью. Сторону
+        // берём живой у мастера. Кэш по стороне; при смене мастера (setMaster) сбрасывается.
         Direction f = currentFacing();
         if (cachedShape == null || f != cachedFacing) {
+            int[] o = geometricOffset(f);
             cachedShape = CrownShapes.build(
-                DrillCrownStructure.cellShapeBoxes(size, ox, oy, oz), f);
+                DrillCrownStructure.cellShapeBoxes(size, o[0], o[1], o[2]), f);
             cachedFacing = f;
         }
         return cachedShape;
+    }
+
+    // Каноническое смещение ячейки по её фактическому положению (worldPos - master) при текущей
+    // стороне. Если положение не распознано (мастер не на месте) — сохранённое при постройке.
+    private int[] geometricOffset(Direction f) {
+        int dx = worldPosition.getX() - masterPos.getX();
+        int dy = worldPosition.getY() - masterPos.getY();
+        int dz = worldPosition.getZ() - masterPos.getZ();
+        int[] o = DrillCrownStructure.inverseCell(size, f, dx, dy, dz);
+        return o != null ? o : new int[]{ ox, oy, oz };
     }
 
     // Текущая сторона мастера (если он на месте), иначе — сохранённая при постройке.

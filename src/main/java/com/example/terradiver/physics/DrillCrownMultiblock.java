@@ -77,22 +77,34 @@ public final class DrillCrownMultiblock {
         if (level.isClientSide) {
             return;
         }
-        int stamped = 0; // ВРЕМЕННО (#3): сколько ведомых реально нашли и перештамповали
-        for (int[] off : DrillCrownStructure.cells(size)) {
-            int[] r = DrillCrownStructure.rotate(off, facing);
-            BlockPos cell = masterPos.offset(r[0], r[1], r[2]);
-            if (cell.equals(masterPos)) {
-                continue;
-            }
-            if (level.getBlockEntity(cell) instanceof DrillCrownPartBlockEntity be) {
+        // Обходим СВЯЗНУЮ структуру короны от мастера (по соседним ячейкам короны) и всем ведомым
+        // чиним указатель на мастера. Форму и сторону ведомая берёт сама: сторону — живой у мастера,
+        // октант — по СВОЕМУ фактическому положению относительно мастера (см. getShape). Поэтому
+        // здесь достаточно поправить masterPos. BFS находит ведомых там, где они реально стоят,
+        // поэтому НЕ зависит от конвенции поворота чужой механики (Sable) — в отличие от прошлого
+        // перебора по предсказанным позициям, который при повороте их не находил.
+        java.util.Set<BlockPos> seen = new java.util.HashSet<>();
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        seen.add(masterPos);
+        queue.add(masterPos);
+        int cap = 4096;
+        while (!queue.isEmpty() && cap-- > 0) {
+            BlockPos p = queue.poll();
+            if (level.getBlockEntity(p) instanceof DrillCrownPartBlockEntity be) {
                 be.setMaster(masterPos);
-                be.setShapeData(size, off[0], off[1], off[2], facing);
-                stamped++;
+            }
+            for (Direction d : Direction.values()) {
+                BlockPos n = p.relative(d);
+                if (seen.add(n) && isCrownCell(level.getBlockState(n))) {
+                    queue.add(n);
+                }
             }
         }
-        org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
-                "[TD-heal] restampParts @ {} facing {} size {}: перештамповано {} из {} ведомых",
-                masterPos, facing, size, stamped, DrillCrownStructure.cells(size).length - 1);
+    }
+
+    private static boolean isCrownCell(BlockState state) {
+        return state.getBlock() instanceof DrillCrownBlock
+                || state.getBlock() instanceof DrillCrownPartBlock;
     }
 
     /*

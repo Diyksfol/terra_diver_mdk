@@ -8,6 +8,7 @@ import com.simibubi.create.content.kinetics.base.IRotate.StressImpact;
 import com.simibubi.create.foundation.utility.CreateLang;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
@@ -25,6 +26,30 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
 
     public CrownBearingBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
+    }
+
+    // ── Плавный старт/торможение + визуальная скорость RPM/4 ──
+    // Цель вращения = 1/4 от штатной угловой скорости Create (256 RPM → выглядит как 64). Плюс не
+    // прыгаем к цели резко, а тянемся к ней не более чем ACCEL град/тик за тик — это даёт плавный
+    // разгон при пуске и плавное торможение при остановке. angle двигает super.tick() по нашему
+    // getAngularSpeed(), поэтому визуал и физика (setAngle → коллизия) идут вместе, без рассинхрона.
+    private static final float SPEED_FACTOR = 0.25F; // RPM/4
+    private static final float ACCEL = 0.75F;        // град/тик за тик (плавность)
+    private float easedAngularSpeed = 0.0F;
+
+    @Override
+    public float getAngularSpeed() {
+        return easedAngularSpeed;
+    }
+
+    @Override
+    public void tick() {
+        // Обновляем плавную скорость РАЗ за тик, до super.tick() (он читает getAngularSpeed()).
+        if (level != null) {
+            float target = SPEED_FACTOR * super.getAngularSpeed();
+            easedAngularSpeed = Mth.approach(easedAngularSpeed, target, ACCEL);
+        }
+        super.tick();
     }
 
     // Убираем прокручиваемую настройку «Режим движения», унаследованную от подшипника Create:
@@ -85,7 +110,9 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         }
         Direction facing = self.getValue(CrownBearingBlock.FACING);
         BlockPos start = worldPosition.relative(facing);
-        if (!isCrown(level.getBlockState(start))) {
+        // Стартуем с блока перед лицом, даже если это НЕ корона: обход пройдёт по склейке и найдёт
+        // корону за обычным блоком (стойка подшипник-блок-бур). Пусто впереди — считать нечего.
+        if (level.getBlockState(start).isAir()) {
             return 0.0F;
         }
         java.util.Set<BlockPos> seen = new java.util.HashSet<>();
@@ -106,10 +133,13 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
                 if (seen.contains(n)) {
                     continue;
                 }
-                // Идём к соседу, если он сам корона ИЛИ приклеен суперклеем к текущему блоку. Так обход
-                // пересекает ОБЫЧНЫЕ склеенные блоки и досчитывает короны за ними (стойка бур-блок-бур),
-                // как и при сборке контраптии. Нагрузку по-прежнему дают только сами короны.
-                if (isCrown(level.getBlockState(n)) || SuperGlueEntity.isGlued(level, p, d, glueCache)) {
+                // К соседу идём, если ОБА — короны (ячейки короны/смежные короны), ИЛИ текущий блок
+                // приклеен к соседу суперклеем. От ОБЫЧНОГО блока — только по клею, поэтому корона,
+                // просто СТОЯЩАЯ вплотную к блоку, но не приклеенная, больше не досчитывается (как и
+                // при сборке контраптии: неприклеенное к стойке не захватывается). Нагрузку дают
+                // только сами короны.
+                boolean bothCrowns = isCrown(st) && isCrown(level.getBlockState(n));
+                if (bothCrowns || SuperGlueEntity.isGlued(level, p, d, glueCache)) {
                     seen.add(n);
                     queue.add(n);
                 }
@@ -132,13 +162,16 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
             return false;
         }
         // gui.goggles.kinetic_stats — ключ САМОГО Create, для него CreateLang.translate корректен.
+        float stress = calculateStressApplied();
         CreateLang.translate("gui.goggles.kinetic_stats").forGoggles(tooltip);
-        addStressImpactStats(tooltip, calculateStressApplied());
-        // Хинт «нужна корона» — только когда НЕ собрано и короны перед лицом нет.
+        addStressImpactStats(tooltip, stress);
+        // Хинт «нужна корона» — когда НЕ собрано и НИ ОДНА корона не досягаема (в т.ч. через склейку),
+        // то есть нагрузка 0. Перед хинтом — пустая строка: перенос между блоком нагрузки и плашкой (#1).
         // ВАЖНО: наши ключи добавляем через builder().add(Component.translatable(...)), а НЕ через
         // CreateLang.translate(...) — тот подставляет префикс "create." и ключ не находится (из-за
         // этого показывались имена переменных). forGoggles даёт правильный отступ.
-        if (!running && frontCrownSide() <= 0 && getBlockState().getBlock() instanceof CrownBearingBlock) {
+        if (!running && stress <= 0.0F && getBlockState().getBlock() instanceof CrownBearingBlock) {
+            tooltip.add(net.minecraft.network.chat.Component.empty());
             CreateLang.builder().add(net.minecraft.network.chat.Component
                     .translatable("hint.terra_diver.crown_bearing.title").withStyle(net.minecraft.ChatFormatting.GOLD)).forGoggles(tooltip);
             CreateLang.builder().add(net.minecraft.network.chat.Component
@@ -157,11 +190,13 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         return false;
     }
 
-    // Собирать разрешаем только когда перед лицом реально стоит корона.
+    // Собирать разрешаем, если в присоединённой конструкции перед лицом (в т.ч. ЧЕРЕЗ склейку) есть
+    // хотя бы одна корона. worldCrownStress > 0 именно это и значит — обход идёт по короне и суперклею,
+    // поэтому стойка подшипник-блок-бур (склеенная) тоже соберётся, а не только корона впритык.
     @Override
     public void assemble() {
-        if (frontCrownSide() <= 0) {
-            return; // нет короны — крутить нечего, подшипник остаётся стоять
+        if (worldCrownStress() <= 0.0F) {
+            return; // корон не найдено — крутить нечего, подшипник остаётся стоять
         }
         super.assemble();
     }
@@ -179,23 +214,6 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
             movedContraption.setAngle(0.0F);
         }
         super.disassemble();
-    }
-
-    // Сторона короны (мастер-блока) прямо перед лицом подшипника; 0 — если короны нет.
-    private int frontCrownSide() {
-        if (level == null) {
-            return 0;
-        }
-        BlockState self = getBlockState();
-        if (!(self.getBlock() instanceof CrownBearingBlock)) {
-            return 0;
-        }
-        Direction facing = self.getValue(CrownBearingBlock.FACING);
-        BlockState front = level.getBlockState(worldPosition.relative(facing));
-        if (front.getBlock() instanceof DrillCrownBlock crown) {
-            return sideOf(crown.crownSize());
-        }
-        return 0;
     }
 
     // "9x9" -> 9

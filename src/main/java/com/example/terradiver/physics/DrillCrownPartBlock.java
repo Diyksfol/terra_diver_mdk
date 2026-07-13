@@ -140,12 +140,6 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
         if (!moved && !state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
             if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
                 BlockState ms = level.getBlockState(be.getMaster());
-                // ВРЕМЕННО (#3/#4): видно, срабатывает ли снос ведомой при склейке и валиден ли мастер.
-                if (!level.isClientSide) {
-                    org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
-                            "[TD-heal] part.onRemove @ {} moved={} masterPos={} masterValid={}",
-                            pos, moved, be.getMaster(), ms.getBlock() instanceof DrillCrownMultiblock.Master);
-                }
                 if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {
                     DrillCrownMultiblock.dissolve(level, be.getMaster(), m.crownSize(), m.crownFacing(ms), ms);
                 }

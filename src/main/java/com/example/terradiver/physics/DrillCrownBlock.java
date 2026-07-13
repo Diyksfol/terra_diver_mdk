@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -29,6 +30,10 @@ import java.util.Map;
 public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Master {
 
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
+    // Крен короны вокруг оси бура, шагами 90° (0..3). Для ВЕРТИКАЛЬНОГО бура (FACING вверх/вниз)
+    // поворот вокруг Y невыразим через FACING — это крен, и он пишется сюда (см. rotate). Модель
+    // проворачивается по нему через blockstate; коллизия ведомых follows фактические позиции.
+    public static final IntegerProperty ROLL = IntegerProperty.create("roll", 0, 3);
 
     // Спецформа острия 1x1 (модельная ориентация, глубина +Y): низ полный + центр-полублок сверху.
     // Острие 1x1: один куб 8x8x8 px по центру в нижней части блока (модельная ориентация).
@@ -47,19 +52,19 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
             m.put(d, CrownShapes.build(base, d));
         }
         this.shapes = m;
-        registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.UP));
+        registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.UP).setValue(ROLL, 0));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, ROLL);
     }
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         Direction face = context.getClickedFace();
         Direction facing = context.isSecondaryUseActive() ? face.getOpposite() : face;
-        return defaultBlockState().setValue(FACING, facing);
+        return defaultBlockState().setValue(FACING, facing).setValue(ROLL, 0);
     }
 
     // Когда корону двигает/поворачивает механика Create (разборка контраптии, склейка слизью,
@@ -71,7 +76,22 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     // самолечение ведомых по факту (см. DrillCrownMultiblock.restampParts) + вопрос к проверке.
     @Override
     public BlockState rotate(BlockState state, Rotation rotation) {
-        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+        Direction facing = state.getValue(FACING);
+        if (facing.getAxis() == Direction.Axis.Y) {
+            // Вертикальный бур: поворот вокруг Y = КРЕН вокруг оси бура, FACING (вверх/вниз) неизменен.
+            // Пишем в ROLL, чтобы модель провернулась вместе со структурой, а не осталась смотреть
+            // «как была». Шаг = столько CLOCKWISE_90, сколько в rotation. Так крен, наложенный Sable
+            // (она зовёт state.rotate этим же Rotation), захватывается прямо здесь — выводить не нужно.
+            int add = switch (rotation) {
+                case CLOCKWISE_90 -> 1;
+                case CLOCKWISE_180 -> 2;
+                case COUNTERCLOCKWISE_90 -> 3;
+                default -> 0;
+            };
+            return state.setValue(ROLL, (state.getValue(ROLL) + add) & 3);
+        }
+        // Горизонтальный бур: обычный поворот стороны (север→восток), крен не задействован.
+        return state.setValue(FACING, rotation.rotate(facing));
     }
 
     @Override

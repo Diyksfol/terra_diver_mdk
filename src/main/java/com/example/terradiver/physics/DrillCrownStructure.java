@@ -122,6 +122,21 @@ public final class DrillCrownStructure {
         };
     }
 
+    // Обратное к rotate: по МИРОВОМУ смещению ячейки (относительно мастера) и стороне вернуть её
+    // КАНОНИЧЕСКОЕ смещение. Нужно, чтобы строить форму ведомой по её ФАКТИЧЕСКОМУ положению —
+    // тогда форма follows любой крен/поворот, наложенный чужой механикой (Sable), НЕ завися от
+    // конвенции этой механики: мы читаем, где ячейка реально стоит, и берём соответствующий октант
+    // тела вращения. null — если такого положения в раскладке нет.
+    public static int[] inverseCell(String size, Direction facing, int dx, int dy, int dz) {
+        for (int[] o : cells(size)) {
+            int[] r = rotate(o, facing);
+            if (r[0] == dx && r[1] == dy && r[2] == dz) {
+                return o;
+            }
+        }
+        return null;
+    }
+
     public static List<BlockPos> worldCells(String size, Direction facing, BlockPos master) {
         List<BlockPos> out = new ArrayList<>();
         for (int[] off : cells(size)) {
