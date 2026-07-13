@@ -3,6 +3,9 @@ package com.example.terradiver.kinetics;
 import com.example.terradiver.physics.DrillCrownBlock;
 import com.example.terradiver.physics.DrillCrownPartBlock;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
+import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
+import com.simibubi.create.content.kinetics.base.IRotate.StressImpact;
+import com.simibubi.create.foundation.utility.CreateLang;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -91,6 +94,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         seen.add(start);
         float sum = 0.0F;
         int cap = 4096; // страховка от разрастания
+        java.util.Set<SuperGlueEntity> glueCache = new java.util.HashSet<>();
         while (!queue.isEmpty() && cap-- > 0) {
             BlockPos p = queue.poll();
             BlockState st = level.getBlockState(p);
@@ -99,7 +103,14 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
             }
             for (Direction d : Direction.values()) {
                 BlockPos n = p.relative(d);
-                if (seen.add(n) && isCrown(level.getBlockState(n))) {
+                if (seen.contains(n)) {
+                    continue;
+                }
+                // Идём к соседу, если он сам корона ИЛИ приклеен суперклеем к текущему блоку. Так обход
+                // пересекает ОБЫЧНЫЕ склеенные блоки и досчитывает короны за ними (стойка бур-блок-бур),
+                // как и при сборке контраптии. Нагрузку по-прежнему дают только сами короны.
+                if (isCrown(level.getBlockState(n)) || SuperGlueEntity.isGlued(level, p, d, glueCache)) {
+                    seen.add(n);
                     queue.add(n);
                 }
             }
@@ -112,28 +123,42 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
                 || state.getBlock() instanceof DrillCrownPartBlock;
     }
 
-    // Полностью прячем create-хинт "empty_bearing" ("Активировать подшипник...") и ставим свой.
-    // Родителя НЕ зовём (иначе он добавит create-хинт). Показ нагрузки в гогглах идёт отдельным
-    // методом (addToGoggleTooltip) и здесь не затрагивается; опускается лишь overstress-хинт.
+    // Показ НАГРУЗКИ в очках. Наследуемый метод Create прячет строку при нагрузке 0 (return false),
+    // а нам нужно, чтобы буровой подшипник, как и обычный, показывал нагрузку ВСЕГДА — даже 0.
+    // Поэтому переопределяем и всегда рисуем «kinetic_stats» + импакт (через штатный addStressImpactStats).
+    @Override
+    public boolean addToGoggleTooltip(java.util.List<net.minecraft.network.chat.Component> tooltip, boolean isPlayerSneaking) {
+        if (!StressImpact.isEnabled()) {
+            return false;
+        }
+        CreateLang.translate("gui.goggles.kinetic_stats").forGoggles(tooltip);
+        addStressImpactStats(tooltip, calculateStressApplied());
+        return true;
+    }
+
+    // Наш hover-хинт «нужна корона». super НЕ зовём: у MechanicalBearing он вешает СТАНДАРТНЫЙ хинт
+    // empty_bearing, который мы специально прячем ради своего. Нагрузка сюда не относится — она идёт
+    // отдельным addToGoggleTooltip выше. Хинт добавляем через CreateLang.forGoggles — это даёт тот же
+    // ОТСТУП, что у штатных строк очков (иначе значок очков налезает на текст). Показываем только
+    // когда НЕ собрано и короны перед лицом нет.
     @Override
     public boolean addToTooltip(java.util.List<net.minecraft.network.chat.Component> tooltip, boolean isPlayerSneaking) {
-        if (running || level == null) {
+        if (running || level == null || isPlayerSneaking) {
             return false;
         }
         BlockState state = getBlockState();
         if (!(state.getBlock() instanceof CrownBearingBlock)) {
             return false;
         }
-        BlockState front = level.getBlockState(worldPosition.relative(state.getValue(CrownBearingBlock.FACING)));
-        if (front.canBeReplaced()) {
-            return false;
+        if (frontCrownSide() > 0) {
+            return false; // корона на месте — хинт не нужен
         }
-        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing.title")
-                .withStyle(net.minecraft.ChatFormatting.GOLD));
-        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing.line1")
-                .withStyle(net.minecraft.ChatFormatting.GRAY));
-        tooltip.add(net.minecraft.network.chat.Component.translatable("hint.terra_diver.crown_bearing.line2")
-                .withStyle(net.minecraft.ChatFormatting.GRAY));
+        CreateLang.translate("hint.terra_diver.crown_bearing.title")
+                .style(net.minecraft.ChatFormatting.GOLD).forGoggles(tooltip);
+        CreateLang.translate("hint.terra_diver.crown_bearing.line1")
+                .style(net.minecraft.ChatFormatting.GRAY).forGoggles(tooltip);
+        CreateLang.translate("hint.terra_diver.crown_bearing.line2")
+                .style(net.minecraft.ChatFormatting.GRAY).forGoggles(tooltip);
         return true;
     }
 
