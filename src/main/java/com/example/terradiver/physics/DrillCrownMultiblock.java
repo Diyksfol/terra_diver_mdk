@@ -102,11 +102,6 @@ public final class DrillCrownMultiblock {
         }
     }
 
-    private static boolean isCrownCell(BlockState state) {
-        return state.getBlock() instanceof DrillCrownBlock
-                || state.getBlock() instanceof DrillCrownPartBlock;
-    }
-
     /*
      * Снести всю структуру: размер и направление заданы явно (надёжно и при сломе мастера, когда
      * его уже нет в мире). Идемпотентно: флаг DISSOLVING гасит повторный вход во время разборки.
