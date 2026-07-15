@@ -36,6 +36,8 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
     private int brakeTicks = -1;                        // сервер: обратный отсчёт торможения
     private float brakeStep = 0.0F;                     // шаг линейного торможения (синхронизируется)
     private boolean clientBraking = false;              // флаг торможения, пришедший с сервера
+    private float brakeRemaining = 0.0F;                // остаток пути до исходного угла (градусы)
+    private int brakeDir = 1;                           // направление докрутки (+1/-1)
 
     @Override
     public float getAngularSpeed() {
@@ -57,12 +59,17 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
     @Override
     public void tick() {
         if (braking()) {
-            // Линейно гасим скорость до нуля. Шаг синхронизирован → клиент тормозит так же, как сервер
-            // (раньше клиент не знал о торможении и рисовал полную скорость до внезапного стопа).
-            float step = brakeStep > 0.0F
-                    ? brakeStep
-                    : Math.abs(easedAngularSpeed) / Math.max(1, rampTicks()) + 0.02F;
-            easedAngularSpeed = Mth.approach(easedAngularSpeed, 0.0F, step);
+            // Гасим скорость линейно и ВЕДЁМ ОСТАТОК ПУТИ до исходного угла явно. Раньше разбор шёл
+            // «когда скорость упадёт до ~0», а до нуля она доходит чуть раньше, чем добирается угол —
+            // отсюда недокрут на пару градусов. Теперь: не даём проскочить (скорость не больше остатка)
+            // и подкручиваем минимальным шагом, пока остаток не станет нулём.
+            float mag = Math.max(0.0F, Math.abs(easedAngularSpeed) - brakeStep);
+            if (brakeRemaining > 0.05F) {
+                mag = Math.max(mag, Math.min(0.3F, brakeRemaining)); // доползти, а не замереть раньше
+            }
+            mag = Math.min(mag, Math.max(0.0F, brakeRemaining));     // не проскочить исходный угол
+            easedAngularSpeed = brakeDir * mag;
+            brakeRemaining -= mag;
         } else {
             // Плавный разгон: только когда собрано (running) — иначе eased раскручивался ещё до сборки
             // (вал крутится вхолостую) и старт был мгновенным.
@@ -74,8 +81,8 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         // Разбор — на сервере, когда скорость упала до ~0 (или по страховочному пределу).
         if (brakeTicks >= 0) {
             brakeTicks--;
-            if (level != null && !level.isClientSide
-                    && (Math.abs(easedAngularSpeed) <= 0.05F || brakeTicks <= 0)) {
+            if (level != null && !level.isClientSide && (brakeRemaining <= 0.05F || brakeTicks <= 0)) {
+                angle = 0.0F; // приехали ровно в исходный угол
                 doDisassemble();
                 return;
             }
@@ -106,6 +113,8 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
                 return;
             }
             brakeStep = v0 * v0 / (2.0F * dist);
+            brakeRemaining = dist;
+            brakeDir = dir;
             brakeTicks = (int) (2.0F * dist / v0) + 40; // страховочный предел
             notifyUpdate(); // сказать клиенту, что пошло торможение
             return;
@@ -119,6 +128,8 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         if (clientPacket) {
             tag.putBoolean("CrownBraking", brakeTicks >= 0);
             tag.putFloat("CrownBrakeStep", brakeStep);
+            tag.putFloat("CrownBrakeLeft", brakeRemaining);
+            tag.putInt("CrownBrakeDir", brakeDir);
         }
     }
 
@@ -128,12 +139,15 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         if (clientPacket) {
             clientBraking = tag.getBoolean("CrownBraking");
             brakeStep = tag.getFloat("CrownBrakeStep");
+            brakeRemaining = tag.getFloat("CrownBrakeLeft");
+            brakeDir = tag.getInt("CrownBrakeDir");
         }
     }
 
     private void doDisassemble() {
         brakeTicks = -1;
         brakeStep = 0.0F;
+        brakeRemaining = 0.0F;
         clientBraking = false;
         if (movedContraption != null) {
             movedContraption.setAngle(0.0F); // парковка в исходную ориентацию

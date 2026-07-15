@@ -29,6 +29,7 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
     private VoxelShape cachedShape; // ленивый кэш
     private Direction cachedFacing;  // при какой ориентации собран кэш
     private int cachedRoll = -1;     // при каком крене собран кэш
+    private BlockPos cachedShapeMaster; // от какого мастера считался октант
 
     public DrillCrownPartBlockEntity(BlockPos pos, BlockState state) {
         super(BlockEntityRegistry.DRILL_CROWN_PART.get(), pos, state);
@@ -65,15 +66,33 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
     // Кэшируем; сбрасываем, если в кэше уже не мастер.
     public BlockPos getMaster() {
         if (level != null) {
-            if (cachedMaster == null
-                    || !(level.getBlockState(cachedMaster).getBlock() instanceof DrillCrownBlock)) {
-                cachedMaster = searchMaster();
+            if (cachedMaster == null || !isMyMaster(cachedMaster)) {
+                // Сохранённый masterPos пробуем ПЕРВЫМ (обычно он верен), обход — запасной путь.
+                cachedMaster = isMyMaster(masterPos) ? masterPos : searchMaster();
             }
             if (cachedMaster != null) {
                 return cachedMaster;
             }
         }
         return masterPos; // запас, если обойти не удалось
+    }
+
+    // Кандидат годится, только если это мастер МОЕЙ короны: тот же размер И моя ячейка реально входит
+    // в его футпринт. Иначе, когда рядом стоят два бура (3x3 и 1x1), ведомая цепляла ЧУЖОГО мастера —
+    // первого попавшегося при обходе — и брала сторону/октант от него. Отсюда «часть блоков коллизии
+    // повёрнута не туда», причём невоспроизводимо: зависело от порядка обхода.
+    private boolean isMyMaster(BlockPos p) {
+        if (level == null || p == null) {
+            return false;
+        }
+        BlockState ms = level.getBlockState(p);
+        if (!(ms.getBlock() instanceof DrillCrownBlock crown) || !size.equals(crown.crownSize())) {
+            return false;
+        }
+        return DrillCrownStructure.inverseCell(size, ms.getValue(DrillCrownBlock.FACING),
+                worldPosition.getX() - p.getX(),
+                worldPosition.getY() - p.getY(),
+                worldPosition.getZ() - p.getZ()) != null;
     }
 
     private BlockPos searchMaster() {
@@ -85,8 +104,8 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
         while (!q.isEmpty() && cap-- > 0) {
             BlockPos p = q.poll();
             BlockState st = level.getBlockState(p);
-            if (st.getBlock() instanceof DrillCrownBlock) {
-                return p; // мастер найден
+            if (st.getBlock() instanceof DrillCrownBlock && isMyMaster(p)) {
+                return p; // мастер МОЕЙ короны найден
             }
             // Идём дальше только по ячейкам короны (сама ведомая или соседние части).
             if (p.equals(worldPosition) || st.getBlock() instanceof DrillCrownPartBlock) {
@@ -109,7 +128,9 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
         // (getMaster), поэтому работает и в сублевеле Sable. Кэш — по паре (сторона, крен).
         Direction f = currentFacing();
         int r = currentRoll();
-        if (cachedShape == null || f != cachedFacing || r != cachedRoll) {
+        BlockPos m = getMaster();
+        if (cachedShape == null || f != cachedFacing || r != cachedRoll || !m.equals(cachedShapeMaster)) {
+            cachedShapeMaster = m;
             int[] o = geometricOffset(f);
             cachedShape = CrownShapes.build(
                 DrillCrownStructure.cellShapeBoxes(size, o[0], o[1], o[2]), f, r);
