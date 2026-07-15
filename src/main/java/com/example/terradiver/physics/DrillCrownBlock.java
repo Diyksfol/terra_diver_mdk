@@ -41,15 +41,19 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     private static final double[][] FULL_CUBE = {{0.0, 0.0, 0.0, 1.0, 1.0, 1.0}};
 
     private final String size;
-    private final Map<Direction, VoxelShape> shapes;
+    private final Map<Direction, VoxelShape[]> shapes;
 
     public DrillCrownBlock(Properties properties, String size) {
         super(properties);
         this.size = size;
         double[][] base = "1x1".equals(size) ? TIP_BASE : FULL_CUBE; // NxN мастер-ячейка — полный куб
-        EnumMap<Direction, VoxelShape> m = new EnumMap<>(Direction.class);
+        EnumMap<Direction, VoxelShape[]> m = new EnumMap<>(Direction.class);
         for (Direction d : Direction.values()) {
-            m.put(d, CrownShapes.build(base, d));
+            VoxelShape[] byRoll = new VoxelShape[4];
+            for (int r = 0; r < 4; r++) {
+                byRoll[r] = CrownShapes.build(base, d, r); // крен: у полного куба — no-op, у 1x1 важен
+            }
+            m.put(d, byRoll);
         }
         this.shapes = m;
         registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.UP).setValue(ROLL, 0));
@@ -117,7 +121,7 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return shapes.get(state.getValue(FACING));
+        return shapes.get(state.getValue(FACING))[state.getValue(ROLL) & 3];
     }
 
     // Не затеняем соседей: корона не блокирует небесный свет, иначе блок под мастером уходит в тень
@@ -167,6 +171,9 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
             // или побиться (октанты не те, часть заменилась полными блоками, недетерминизм). Раз мастер
             // корректен — ПЕРЕСОБИРАЕМ ведомых от него с нуля: buildParts перезаписывает ячейки свежими
             // блоками с правильными данными. Это надёжнее и детерминированнее починки по одной ячейке.
+            org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
+                    "[TD-rebuild] @ {} facing {} roll {} size {}",
+                    pos, now.getValue(FACING), now.getValue(ROLL), crown.crownSize());
             DrillCrownMultiblock.buildParts(level, pos, crown.crownSize(), now.getValue(FACING));
         }
     }

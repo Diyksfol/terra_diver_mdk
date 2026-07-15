@@ -28,6 +28,7 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
 
     private VoxelShape cachedShape; // ленивый кэш
     private Direction cachedFacing;  // при какой ориентации собран кэш
+    private int cachedRoll = -1;     // при каком крене собран кэш
 
     public DrillCrownPartBlockEntity(BlockPos pos, BlockState state) {
         super(BlockEntityRegistry.DRILL_CROWN_PART.get(), pos, state);
@@ -35,6 +36,7 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
 
     public void setMaster(BlockPos master) {
         this.masterPos = master;
+        this.cachedMaster = null; // перепроверить/переискать мастера обходом
         this.cachedShape = null; // положение относительно мастера изменилось — форма пересоберётся
         setChanged();
     }
@@ -54,39 +56,94 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
         }
     }
 
+    private BlockPos cachedMaster = null;
+
+    // Мастера ищем ОБХОДОМ смежных ячеек короны (BFS), а не по сохранённому абсолютному masterPos.
+    // Причина: когда бур становится физштуковиной, его ячейки живут в СУБЛЕВЕЛЕ Sable (др. координаты),
+    // и абсолютный masterPos устаревает → ломание ведомой не находит мастера и не сносит корону.
+    // Смежность же сохраняется при любом жёстком переносе и в любом уровне, поэтому поиск надёжен.
+    // Кэшируем; сбрасываем, если в кэше уже не мастер.
     public BlockPos getMaster() {
-        return masterPos;
+        if (level != null) {
+            if (cachedMaster == null
+                    || !(level.getBlockState(cachedMaster).getBlock() instanceof DrillCrownBlock)) {
+                cachedMaster = searchMaster();
+            }
+            if (cachedMaster != null) {
+                return cachedMaster;
+            }
+        }
+        return masterPos; // запас, если обойти не удалось
+    }
+
+    private BlockPos searchMaster() {
+        java.util.Set<BlockPos> seen = new java.util.HashSet<>();
+        java.util.ArrayDeque<BlockPos> q = new java.util.ArrayDeque<>();
+        seen.add(worldPosition);
+        q.add(worldPosition);
+        int cap = 512; // страховка от разрастания
+        while (!q.isEmpty() && cap-- > 0) {
+            BlockPos p = q.poll();
+            BlockState st = level.getBlockState(p);
+            if (st.getBlock() instanceof DrillCrownBlock) {
+                return p; // мастер найден
+            }
+            // Идём дальше только по ячейкам короны (сама ведомая или соседние части).
+            if (p.equals(worldPosition) || st.getBlock() instanceof DrillCrownPartBlock) {
+                for (Direction d : Direction.values()) {
+                    BlockPos n = p.relative(d);
+                    if (seen.add(n)) {
+                        q.add(n);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public VoxelShape getShape() {
-        // Форму ячейки строим по её ФАКТИЧЕСКОМУ положению относительно мастера, а не по сохранённому
-        // смещению: тогда после любого поворота/крена, наложенного чужой механикой (подшипник, Sable),
-        // октант тела вращения follows реальное положение и совпадает с повёрнутой моделью. Сторону
-        // берём живой у мастера. Кэш по стороне; при смене мастера (setMaster) сбрасывается.
+        // Октант ячейки выводим из её ФАКТИЧЕСКОГО положения относительно мастера, а не из
+        // сохранённого смещения: rotate(off,facing) не переживает поворот структуры чужой механикой
+        // (ячейка уезжает не в ту клетку, где её ждёт раскладка новой стороны), и сохранённое смещение
+        // становится чужим — отсюда «блоки на местах, но повёрнуты не туда». Мастера ищем обходом
+        // (getMaster), поэтому работает и в сублевеле Sable. Кэш — по паре (сторона, крен).
         Direction f = currentFacing();
-        if (cachedShape == null || f != cachedFacing) {
+        int r = currentRoll();
+        if (cachedShape == null || f != cachedFacing || r != cachedRoll) {
             int[] o = geometricOffset(f);
             cachedShape = CrownShapes.build(
-                DrillCrownStructure.cellShapeBoxes(size, o[0], o[1], o[2]), f);
+                DrillCrownStructure.cellShapeBoxes(size, o[0], o[1], o[2]), f, r);
             cachedFacing = f;
+            cachedRoll = r;
         }
         return cachedShape;
     }
 
-    // Каноническое смещение ячейки по её фактическому положению (worldPos - master) при текущей
-    // стороне. Если положение не распознано (мастер не на месте) — сохранённое при постройке.
+    // Каноническое смещение по фактическому положению ячейки; если не распознано — сохранённое.
     private int[] geometricOffset(Direction f) {
-        int dx = worldPosition.getX() - masterPos.getX();
-        int dy = worldPosition.getY() - masterPos.getY();
-        int dz = worldPosition.getZ() - masterPos.getZ();
-        int[] o = DrillCrownStructure.inverseCell(size, f, dx, dy, dz);
+        BlockPos m = getMaster();
+        int[] o = DrillCrownStructure.inverseCell(size, f,
+                worldPosition.getX() - m.getX(),
+                worldPosition.getY() - m.getY(),
+                worldPosition.getZ() - m.getZ());
         return o != null ? o : new int[]{ ox, oy, oz };
+    }
+
+    // Крен мастера (0..3); если мастера нет — 0.
+    private int currentRoll() {
+        if (level != null) {
+            BlockState ms = level.getBlockState(getMaster());
+            if (ms.getBlock() instanceof DrillCrownBlock) {
+                return ms.getValue(DrillCrownBlock.ROLL);
+            }
+        }
+        return 0;
     }
 
     // Текущая сторона мастера (если он на месте), иначе — сохранённая при постройке.
     private Direction currentFacing() {
         if (level != null) {
-            BlockState ms = level.getBlockState(masterPos);
+            BlockState ms = level.getBlockState(getMaster());
             if (ms.getBlock() instanceof DrillCrownBlock) {
                 return ms.getValue(DrillCrownBlock.FACING);
             }

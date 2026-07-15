@@ -95,6 +95,22 @@ public final class DrillCrownStructure {
         return c;
     }
 
+    // Обратное к rotate: по МИРОВОМУ смещению ячейки (относительно мастера) и стороне вернуть её
+    // КАНОНИЧЕСКОЕ смещение. Нужно потому, что rotate(off,facing) — это НЕ композиция глобального
+    // поворота: при повороте структуры чужой механикой (N→E) ячейка уезжает не туда, где её ждёт
+    // раскладка для новой стороны, и сохранённое смещение ведомой становится чужим (октант не тот).
+    // Вывод по факт. положению это чинит: где ячейка реально стоит — такой октант тела вращения и
+    // берём. null — если положение не распознано.
+    public static int[] inverseCell(String size, Direction facing, int dx, int dy, int dz) {
+        for (int[] o : cells(size)) {
+            int[] r = rotate(o, facing);
+            if (r[0] == dx && r[1] == dy && r[2] == dz) {
+                return o;
+            }
+        }
+        return null;
+    }
+
     public static int depthLayers(String size) {
         return "1x1".equals(size) ? 1 : 2;
     }
@@ -120,21 +136,6 @@ public final class DrillCrownStructure {
             case EAST  -> new int[]{ y, -x,  z};
             case WEST  -> new int[]{-y,  x,  z};
         };
-    }
-
-    // Обратное к rotate: по МИРОВОМУ смещению ячейки (относительно мастера) и стороне вернуть её
-    // КАНОНИЧЕСКОЕ смещение. Нужно, чтобы строить форму ведомой по её ФАКТИЧЕСКОМУ положению —
-    // тогда форма follows любой крен/поворот, наложенный чужой механикой (Sable), НЕ завися от
-    // конвенции этой механики: мы читаем, где ячейка реально стоит, и берём соответствующий октант
-    // тела вращения. null — если такого положения в раскладке нет.
-    public static int[] inverseCell(String size, Direction facing, int dx, int dy, int dz) {
-        for (int[] o : cells(size)) {
-            int[] r = rotate(o, facing);
-            if (r[0] == dx && r[1] == dy && r[2] == dz) {
-                return o;
-            }
-        }
-        return null;
     }
 
     public static List<BlockPos> worldCells(String size, Direction facing, BlockPos master) {

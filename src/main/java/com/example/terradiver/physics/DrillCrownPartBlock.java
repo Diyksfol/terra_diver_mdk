@@ -140,9 +140,17 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
         if (!moved && !state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
             if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
                 BlockState ms = level.getBlockState(be.getMaster());
+                boolean valid = ms.getBlock() instanceof DrillCrownMultiblock.Master;
+                if (!level.isClientSide) {
+                    org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
+                            "[TD-break] part.onRemove @ {} master={} masterValid={}", pos, be.getMaster(), valid);
+                }
                 if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {
                     DrillCrownMultiblock.dissolve(level, be.getMaster(), m.crownSize(), m.crownFacing(ms), ms);
                 }
+            } else if (!level.isClientSide) {
+                org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
+                        "[TD-break] part.onRemove @ {} — BE НЕ найдена (не ведомая?)", pos);
             }
         }
         super.onRemove(state, level, pos, newState, moved);

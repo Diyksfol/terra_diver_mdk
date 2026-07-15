@@ -80,6 +80,7 @@ public final class DrillCrownMultiblock {
             ServerLevel server = level instanceof ServerLevel sl ? sl : null;
             BlockParticleOption particle = server != null && particleState != null && !single
                     ? new BlockParticleOption(ParticleTypes.BLOCK, particleState) : null;
+            int removed = 0;
             for (BlockPos cell : DrillCrownStructure.worldCells(size, facing, masterPos)) {
                 // Частицы — по КАЖДОЙ ячейке футпринта, включая уже сломанную (её ванильные частицы
                 // подавлены, иначе она сыпала бы «не тем» цветом). Красим все по материалу мастера.
@@ -90,7 +91,12 @@ public final class DrillCrownMultiblock {
                 }
                 if (isCrownCell(level.getBlockState(cell))) {
                     level.removeBlock(cell, false);
+                    removed++;
                 }
+            }
+            if (!level.isClientSide) {
+                org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
+                        "[TD-break] dissolve @ {} facing {} size {}: снесено {} ячеек", masterPos, facing, size, removed);
             }
         } finally {
             DISSOLVING.set(Boolean.FALSE);

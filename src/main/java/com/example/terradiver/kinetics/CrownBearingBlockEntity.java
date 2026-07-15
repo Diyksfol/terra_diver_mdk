@@ -29,28 +29,116 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
     }
 
     // ── Плавный старт/торможение + визуальная скорость RPM/4 ──
-    private static final float SPEED_FACTOR = 0.25F; // визуальная скорость = RPM/4
-    private static final int RAMP_TICKS = 30;        // ~1.5с на разгон/торможение при ЛЮБОЙ скорости
+    private static final float SPEED_FACTOR = 0.25F;   // визуальная скорость = RPM/4
+    private static final int BASE_RAMP_TICKS = 50;     // ~2.5с базы (пустой/лёгкий бур)
+    private static final float TICKS_PER_SU = 1.0F;    // + столько тиков разгона на единицу нагрузки
     private float easedAngularSpeed = 0.0F;
+    private int brakeTicks = -1;                        // сервер: обратный отсчёт торможения
+    private float brakeStep = 0.0F;                     // шаг линейного торможения (синхронизируется)
+    private boolean clientBraking = false;              // флаг торможения, пришедший с сервера
 
     @Override
     public float getAngularSpeed() {
         return easedAngularSpeed;
     }
 
+    // Длительность разгона/торможения в тиках: чем больше нагрузка (SU — больше/крупнее буров), тем
+    // ДОЛЬШЕ раскрутка — показываем «тяжесть». Прочное буровое крепление позже переопределит этот
+    // метод (встроенный маховик → разгон быстрее). Значения — TUNE.
+    protected int rampTicks() {
+        return (int) (BASE_RAMP_TICKS + Math.abs(lastStressApplied) * TICKS_PER_SU);
+    }
+
+    // Идёт ли торможение: на сервере — по brakeTicks, на клиенте — по синхронизированному флагу.
+    private boolean braking() {
+        return level != null && level.isClientSide ? clientBraking : brakeTicks >= 0;
+    }
+
     @Override
     public void tick() {
-        // Плавная угловая скорость (RPM/4). Шаг пропорционален скорости → разгон/торможение ~RAMP_TICKS
-        // тиков при любой скорости. КЛЮЧЕВОЕ: разгоняем ТОЛЬКО когда СОБРАНО (running). Иначе eased
-        // раскручивался ещё до сборки (вал крутится вхолостую), и корона стартовала сразу на максимуме —
-        // отсюда «нет разгона». Пока не собрано — держим 0; после сборки плавно поднимаемся ОТ 0; при
-        // снятии оборотов — плавно опускаемся (в покое корона докручивается на месте). angle двигает
-        // super.tick() по нашему getAngularSpeed(), поэтому визуал и физика идут вместе.
-        float target = running ? SPEED_FACTOR * super.getAngularSpeed() : 0.0F;
-        float ref = Math.max(Math.abs(target), Math.abs(easedAngularSpeed));
-        float step = ref / RAMP_TICKS + 0.02F;
-        easedAngularSpeed = Mth.approach(easedAngularSpeed, target, step);
+        if (braking()) {
+            // Линейно гасим скорость до нуля. Шаг синхронизирован → клиент тормозит так же, как сервер
+            // (раньше клиент не знал о торможении и рисовал полную скорость до внезапного стопа).
+            float step = brakeStep > 0.0F
+                    ? brakeStep
+                    : Math.abs(easedAngularSpeed) / Math.max(1, rampTicks()) + 0.02F;
+            easedAngularSpeed = Mth.approach(easedAngularSpeed, 0.0F, step);
+        } else {
+            // Плавный разгон: только когда собрано (running) — иначе eased раскручивался ещё до сборки
+            // (вал крутится вхолостую) и старт был мгновенным.
+            float target = running ? SPEED_FACTOR * super.getAngularSpeed() : 0.0F;
+            float ref = Math.max(Math.abs(target), Math.abs(easedAngularSpeed));
+            float astep = ref / Math.max(1, rampTicks()) + 0.02F;
+            easedAngularSpeed = Mth.approach(easedAngularSpeed, target, astep);
+        }
+        // Разбор — на сервере, когда скорость упала до ~0 (или по страховочному пределу).
+        if (brakeTicks >= 0) {
+            brakeTicks--;
+            if (level != null && !level.isClientSide
+                    && (Math.abs(easedAngularSpeed) <= 0.05F || brakeTicks <= 0)) {
+                doDisassemble();
+                return;
+            }
+        }
         super.tick();
+    }
+
+    // Разборка НЕ резкая: если корона ещё крутится и торможение не запущено — запускаем плавное
+    // торможение (линейно до нуля за ~rampTicks) и синхронизируем его на клиент; сама разборка
+    // сработает в tick, когда докрутит.
+    @Override
+    public void disassemble() {
+        if (brakeTicks < 0 && running && movedContraption != null && Math.abs(easedAngularSpeed) > 0.1F) {
+            // Тормозим так, чтобы ОСТАНОВИТЬСЯ РОВНО В ИСХОДНОМ ПОЛОЖЕНИИ (угол 0), а не встать где
+            // попало и потом резко доснапиться при разборке. Считаем путь до нуля в текущем направлении
+            // и добираем целые обороты, чтобы торможение длилось примерно rampTicks: при линейном
+            // замедлении путь = v0*N/2, отсюда шаг = v0²/(2*путь). Итог: бур плавно докручивается и
+            // замирает на исходном угле, а setAngle(0) при разборке уже ничего не двигает.
+            float v0 = Math.abs(easedAngularSpeed);
+            int dir = easedAngularSpeed >= 0 ? 1 : -1;
+            float a = ((angle % 360.0F) + 360.0F) % 360.0F;
+            float remaining = dir > 0 ? (360.0F - a) % 360.0F : a;
+            int n = Math.max(1, rampTicks());
+            int turns = Math.max(0, Math.round((v0 * n / 2.0F - remaining) / 360.0F));
+            float dist = remaining + 360.0F * turns;
+            if (dist < 1.0F) {
+                doDisassemble(); // уже практически в исходном
+                return;
+            }
+            brakeStep = v0 * v0 / (2.0F * dist);
+            brakeTicks = (int) (2.0F * dist / v0) + 40; // страховочный предел
+            notifyUpdate(); // сказать клиенту, что пошло торможение
+            return;
+        }
+        doDisassemble();
+    }
+
+    @Override
+    public void write(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.write(tag, registries, clientPacket);
+        if (clientPacket) {
+            tag.putBoolean("CrownBraking", brakeTicks >= 0);
+            tag.putFloat("CrownBrakeStep", brakeStep);
+        }
+    }
+
+    @Override
+    protected void read(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
+        super.read(tag, registries, clientPacket);
+        if (clientPacket) {
+            clientBraking = tag.getBoolean("CrownBraking");
+            brakeStep = tag.getFloat("CrownBrakeStep");
+        }
+    }
+
+    private void doDisassemble() {
+        brakeTicks = -1;
+        brakeStep = 0.0F;
+        clientBraking = false;
+        if (movedContraption != null) {
+            movedContraption.setAngle(0.0F); // парковка в исходную ориентацию
+        }
+        super.disassemble();
     }
 
     // Убираем прокручиваемую настройку «Режим движения», унаследованную от подшипника Create:
@@ -200,22 +288,6 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
             return; // корон не найдено — крутить нечего, подшипник остаётся стоять
         }
         super.assemble();
-    }
-
-    // При остановке наш подшипник ВСЕГДА возвращает всю прикреплённую сборку в ЕДИНСТВЕННОЕ
-    // исходное положение (угол 0), а не в ближайшие 90°. Тогда что бы к нему ни было прицеплено —
-    // корона, короны на короне, любые блоки — при разборке ложится ровно так, как собиралось, и
-    // никакие данные формы ведомых не устаревают. Create в makeStructureTransform читает угол у
-    // самой контраптии (в disassemble он там НЕ сбрасывается), поэтому обнуляем его ДО super —
-    // трансформ выходит нулевым и блоки встают в исходные клетки. Проверено по исходникам Create
-    // (ControlledContraptionEntity.makeStructureTransform + AbstractContraptionEntity.disassemble).
-    @Override
-    public void disassemble() {
-        // Паркуем прикреплённое в исходную ориентацию (крен/поворот в 0), затем штатно разбираем.
-        if (movedContraption != null) {
-            movedContraption.setAngle(0.0F);
-        }
-        super.disassemble();
     }
 
     // "9x9" -> 9
