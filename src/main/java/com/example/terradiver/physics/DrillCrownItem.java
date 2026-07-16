@@ -28,9 +28,19 @@ public class DrillCrownItem extends BlockItem {
         super(block, properties);
     }
 
+    // Показать причину отказа ТОЛЬКО тому игроку, кто ставит: строкой над хотбаром (action bar) —
+    // это и есть «плашка», отдельный GUI под неё не нужен. Клиентскую половину вызова пропускаем,
+    // иначе сообщение продублируется (place() выполняется на обеих сторонах).
+    private static void warn(BlockPlaceContext context, String key, String size) {
+        if (context.getPlayer() instanceof net.minecraft.server.level.ServerPlayer player) {
+            player.displayClientMessage(net.minecraft.network.chat.Component
+                    .translatable(key, size)
+                    .withStyle(net.minecraft.ChatFormatting.RED), true);
+        }
+    }
+
     @Override
-    public InteractionResult place(BlockPlaceContext context) {
-        if (!(getBlock() instanceof DrillCrownBlock master)) {
+    public InteractionResult place(BlockPlaceContext context) {        if (!(getBlock() instanceof DrillCrownBlock master)) {
             return InteractionResult.FAIL;
         }
         Level level = context.getLevel();
@@ -50,9 +60,11 @@ public class DrillCrownItem extends BlockItem {
         // И свободны от живых существ (иначе игрок окажется замурован и начнёт задыхаться).
         for (BlockPos cell : cells) {
             if (!level.getBlockState(cell).canBeReplaced(context)) {
-                return InteractionResult.FAIL; // нет места (в будущем — предупреждение игроку)
+                warn(context, "msg.terra_diver.crown_no_space", master.crownSize());
+                return InteractionResult.FAIL; // нет места
             }
             if (!level.getEntitiesOfClass(LivingEntity.class, new AABB(cell)).isEmpty()) {
+                warn(context, "msg.terra_diver.crown_blocked_entity", master.crownSize());
                 return InteractionResult.FAIL; // в ячейке живое существо
             }
         }

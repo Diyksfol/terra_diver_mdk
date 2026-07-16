@@ -16,6 +16,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 
@@ -36,9 +38,23 @@ public class TerraDiver {
 
         // Register the common setup event
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(TerraDiver::registerCapabilities);
 
         // Register server starting event - register static methods
         NeoForge.EVENT_BUS.register(TerraDiver.class);
+    }
+
+    /*
+     * Открываем буфер крепления бурового подшипника наружу. Своего интерфейса у него нет — игрок
+     * руками туда не лезет; забирают породу воронки и логистика Create через эту способность.
+     * Со всех сторон одинаково: сам буфер не пускает чужую вставку, поэтому ограничивать стороны
+     * незачем — забрать можно откуда угодно, положить нельзя ниоткуда.
+     */
+    private static void registerCapabilities(final RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(
+                Capabilities.ItemHandler.BLOCK,
+                BlockEntityRegistry.CROWN_BEARING.get(),
+                (be, side) -> be.getBuffer());
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {

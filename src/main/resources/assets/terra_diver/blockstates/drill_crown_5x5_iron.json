@@ -1,111 +1,27 @@
 {
   "variants": {
-    "facing=up,roll=0": {
+    "facing=up": {
       "model": "terra_diver:block/drill_5x5_iron"
     },
-    "facing=up,roll=1": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "y": 270
-    },
-    "facing=up,roll=2": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "y": 180
-    },
-    "facing=up,roll=3": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "y": 90
-    },
-    "facing=down,roll=0": {
+    "facing=down": {
       "model": "terra_diver:block/drill_5x5_iron",
       "x": 180
     },
-    "facing=down,roll=1": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 180,
-      "y": 270
-    },
-    "facing=down,roll=2": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 180,
-      "y": 180
-    },
-    "facing=down,roll=3": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 180,
-      "y": 90
-    },
-    "facing=north,roll=0": {
+    "facing=north": {
       "model": "terra_diver:block/drill_5x5_iron",
       "x": 90
     },
-    "facing=north,roll=1": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90
-    },
-    "facing=north,roll=2": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90
-    },
-    "facing=north,roll=3": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90
-    },
-    "facing=south,roll=0": {
+    "facing=south": {
       "model": "terra_diver:block/drill_5x5_iron",
       "x": 90,
       "y": 180
     },
-    "facing=south,roll=1": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 180
-    },
-    "facing=south,roll=2": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 180
-    },
-    "facing=south,roll=3": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 180
-    },
-    "facing=east,roll=0": {
+    "facing=east": {
       "model": "terra_diver:block/drill_5x5_iron",
       "x": 90,
       "y": 90
     },
-    "facing=east,roll=1": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 90
-    },
-    "facing=east,roll=2": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 90
-    },
-    "facing=east,roll=3": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 90
-    },
-    "facing=west,roll=0": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 270
-    },
-    "facing=west,roll=1": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 270
-    },
-    "facing=west,roll=2": {
-      "model": "terra_diver:block/drill_5x5_iron",
-      "x": 90,
-      "y": 270
-    },
-    "facing=west,roll=3": {
+    "facing=west": {
       "model": "terra_diver:block/drill_5x5_iron",
       "x": 90,
       "y": 270

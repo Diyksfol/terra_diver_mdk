@@ -6,6 +6,12 @@ import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEn
 import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
 import com.simibubi.create.content.kinetics.base.IRotate.StressImpact;
 import com.simibubi.create.foundation.utility.CreateLang;
+import com.simibubi.create.foundation.utility.ServerSpeedProvider;
+import com.example.terradiver.config.ModConfig;
+import com.example.terradiver.registry.BlockRegistry;
+import dev.ryanhcode.offroad.handlers.server.MultiMiningSupplier;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
@@ -21,113 +27,258 @@ import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemp
  * Нагрузка задана явной таблицей, а не формулой: рост между 3x3 и 5x5 круче остальных шагов.
  * Ориентир Create: мех.бур = 4, бурильное колесо (3x3) = 8; здесь взят вдвое более крутой рост.
  * Значения: 1x1=8, 3x3=24, 5x5=48, 7x7=64, 9x9=80, 11x11=96 (полный 11x11 на максимуме ~81920 SU).
+ *
+ * ── Кто считает скорость вращения ──
+ * Профиль скорости (S-кривая разгона и торможения) считает ТОЛЬКО сервер. Клиент профиль не строит:
+ * он получает параметры кривой пакетом и просто крутит счётчик тиков по той же формуле.
+ *
+ * Причина категорическая. Родительский getAngularSpeed() у Create на клиенте возвращает НЕ чистую
+ * скорость вала, а скорость, домноженную на ServerSpeedProvider.get() (компенсатор тикрейта, живой
+ * LerpedFloat) и с добавленным clientAngleDiff/3 (добор до серверного угла, делится пополам каждый
+ * тик). Обе величины дрожат от тика к тику. Любая кривая с внутренним состоянием, у которой ЦЕЛЬ
+ * взята из этой величины, обнуляет свой прогресс каждый тик и превращается в асимптотическое
+ * микроползание. Предыдущий (линейный) профиль этого не замечал: Mth.approach шёл к цели шагом от
+ * ТЕКУЩЕЙ скорости и состояния не имел, поэтому дрожание цели его не ломало.
+ * Поэтому: цель берётся из convertToAngular(getSpeed()) — чистой синхронизируемой скорости сети,
+ * одинаковой на обеих сторонах, а клиентские поправки Create добавляются поверх готового результата,
+ * в getAngularSpeed(), ровно как это делает сам Create.
  */
-public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
+public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implements MultiMiningSupplier {
 
     public CrownBearingBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
     }
 
-    // ── Плавный старт/торможение + визуальная скорость RPM/4 ──
-    private static final float SPEED_FACTOR = 0.25F;   // визуальная скорость = RPM/4
-    private static final int BASE_RAMP_TICKS = 50;     // ~2.5с базы (пустой/лёгкий бур)
-    private static final float TICKS_PER_SU = 1.0F;    // + столько тиков разгона на единицу нагрузки
-    private float easedAngularSpeed = 0.0F;
-    private int brakeTicks = -1;                        // сервер: обратный отсчёт торможения
-    private float brakeStep = 0.0F;                     // шаг линейного торможения (синхронизируется)
-    private boolean clientBraking = false;              // флаг торможения, пришедший с сервера
-    private float brakeRemaining = 0.0F;                // остаток пути до исходного угла (градусы)
-    private int brakeDir = 1;                           // направление докрутки (+1/-1)
+    // ── Настройки профиля ──
+    private static final float SPEED_FACTOR = 0.25F;    // визуальная скорость = RPM/4
+    private static final int BASE_RAMP_TICKS = 50;      // ~2.5с базы (пустой/лёгкий бур)
+    private static final float TICKS_PER_SU = 1.0F;     // + столько тиков разгона на единицу нагрузки
+    private static final float TARGET_EPSILON = 0.001F; // мёртвая зона смены цели
+    private static final float MIN_BRAKE_SPEED = 0.1F;  // ниже этой скорости тормозить нечего
+    private static final float BRAKE_ARRIVE_EPS = 0.05F;// остаток пути, считающийся нулевым (градусы)
+    private static final float BRAKE_CRAWL = 0.3F;      // минимальный доводочный шаг, градусов/тик
+    private static final int BRAKE_GUARD_TICKS = 40;    // страховочный запас тиков сверх расчётного
 
+    // Итоговая скорость профиля. Сервер её считает, клиент — воспроизводит по синхронизированным
+    // параметрам кривой. Клиентские поправки Create сюда НЕ входят (см. getAngularSpeed).
+    private float easedAngularSpeed = 0.0F;
+
+    // Разгон. rampStart/rampTarget/rampLen задаёт сервер при смене цели и синкает; rampAge крутят обе
+    // стороны сами и он тоже синкается — пакет приходит раз в 3 тика (lazyTick), между пакетами
+    // клиент идёт по кривой сам, поэтому разгон плавный, а не ступенчатый.
+    private float rampStart = 0.0F;
+    private float rampTarget = 0.0F;
+    private int rampLen = 1;
+    private int rampAge = 0;
+
+    // Торможение с докруткой в исходный угол. Профиль целиком задаёт сервер в disassemble().
+    // Это трапеция: brakeCoast тиков на постоянной скорости (выбег), затем brakeLen тиков спада по
+    // S-кривой. Выбег нужен потому, что до исходного угла бывает дальше, чем накрывает сам спад, а
+    // растягивать спад на всю дистанцию нельзя — на малых оборотах он превращался в десятисекундное
+    // переползание. Длина спада всегда = rampTicks(), поэтому останов ощущается зеркально разгону.
+    private boolean braking = false;
+    private float brakeV0 = 0.0F;
+    private int brakeCoast = 0;
+    private int brakeLen = 1;
+    private int brakeAge = 0;
+    private float brakeRemaining = 0.0F;
+    private int brakeDir = 1;
+    private int brakeGuard = 0;
+
+    // Блок сносят: тормозить некогда, иначе BE умрёт с недоразобранной контраптией на руках.
+    private boolean removing = false;
+
+    // Буфер крепления. Создаётся лениво: объём зависит от того, андезитовый подшипник или прочный,
+    // а блокстейт в конструкторе ещё не гарантирован.
+    private CrownBufferHandler buffer;
+
+    // Множитель скорости грызни. Подобрать на плейтесте. - TUNE
+    private static final float BREAK_SPEED_DIVISOR = 40.0F;
+
+    /*
+     * Скорость вращения для родителя: он ею и крутит угол в tick(), и интерполирует рендер.
+     * Структура один в один как у Create — только вместо чистой скорости вала наша кривая.
+     * Клиентские слагаемые обязательны: без clientAngleDiff клиентский угол уедет от серверного
+     * и никогда не догонит, а без ServerSpeedProvider вращение поплывёт при лаге.
+     */
     @Override
     public float getAngularSpeed() {
-        return easedAngularSpeed;
+        float speed = easedAngularSpeed;
+        if (level != null && level.isClientSide) {
+            speed *= ServerSpeedProvider.get();
+            speed += clientAngleDiff / 3.0F;
+        }
+        return speed;
+    }
+
+    // S-кривая (cubic ease-in-out): плавно трогается и плавно приходит к цели — скорость выглядит
+    // трапецией с «круглыми» концами. Среднее значение = 0.5, как у линейного разгона, поэтому
+    // пройденный путь при торможении считается той же формулой (v0*N/2) и докрутка остаётся точной.
+    private static float smoothstep(float t) {
+        t = Mth.clamp(t, 0.0F, 1.0F);
+        return t * t * (3.0F - 2.0F * t);
     }
 
     // Длительность разгона/торможения в тиках: чем больше нагрузка (SU — больше/крупнее буров), тем
     // ДОЛЬШЕ раскрутка — показываем «тяжесть». Прочное буровое крепление позже переопределит этот
     // метод (встроенный маховик → разгон быстрее). Значения — TUNE.
+    // Зовётся ТОЛЬКО на сервере: lastStressApplied на клиенте приезжает из NBT и может отстать.
     protected int rampTicks() {
         return (int) (BASE_RAMP_TICKS + Math.abs(lastStressApplied) * TICKS_PER_SU);
     }
 
-    // Идёт ли торможение: на сервере — по brakeTicks, на клиенте — по синхронизированному флагу.
-    private boolean braking() {
-        return level != null && level.isClientSide ? clientBraking : brakeTicks >= 0;
+    /*
+     * Длина конкретного разгона: полная длительность масштабируется долей пути, который реально
+     * надо пройти. Пуск с нуля на полные обороты = полная длительность; подкрутка оборотов на ходу
+     * с 32 до 40 = пятая часть. Иначе любая мелкая правка скорости тянулась бы те же 2.5-7 секунд.
+     */
+    private int rampLengthFor(float from, float to) {
+        int base = Math.max(1, rampTicks());
+        float scale = Math.max(Math.abs(from), Math.abs(to));
+        if (scale <= TARGET_EPSILON) {
+            return 1;
+        }
+        float portion = Mth.clamp(Math.abs(to - from) / scale, 0.0F, 1.0F);
+        return Math.max(1, Math.round(base * portion));
     }
 
     @Override
     public void tick() {
-        if (braking()) {
-            // Гасим скорость линейно и ВЕДЁМ ОСТАТОК ПУТИ до исходного угла явно. Раньше разбор шёл
-            // «когда скорость упадёт до ~0», а до нуля она доходит чуть раньше, чем добирается угол —
-            // отсюда недокрут на пару градусов. Теперь: не даём проскочить (скорость не больше остатка)
-            // и подкручиваем минимальным шагом, пока остаток не станет нулём.
-            float mag = Math.max(0.0F, Math.abs(easedAngularSpeed) - brakeStep);
-            if (brakeRemaining > 0.05F) {
-                mag = Math.max(mag, Math.min(0.3F, brakeRemaining)); // доползти, а не замереть раньше
+        if (level != null && !level.isClientSide) {
+            if (serverProfileTick()) {
+                return; // разобрались в этом тике, дальше тикать нечего
             }
-            mag = Math.min(mag, Math.max(0.0F, brakeRemaining));     // не проскочить исходный угол
-            easedAngularSpeed = brakeDir * mag;
-            brakeRemaining -= mag;
         } else {
-            // Плавный разгон: только когда собрано (running) — иначе eased раскручивался ещё до сборки
-            // (вал крутится вхолостую) и старт был мгновенным.
-            float target = running ? SPEED_FACTOR * super.getAngularSpeed() : 0.0F;
-            float ref = Math.max(Math.abs(target), Math.abs(easedAngularSpeed));
-            float astep = ref / Math.max(1, rampTicks()) + 0.02F;
-            easedAngularSpeed = Mth.approach(easedAngularSpeed, target, astep);
-        }
-        // Разбор — на сервере, когда скорость упала до ~0 (или по страховочному пределу).
-        if (brakeTicks >= 0) {
-            brakeTicks--;
-            if (level != null && !level.isClientSide && (brakeRemaining <= 0.05F || brakeTicks <= 0)) {
-                angle = 0.0F; // приехали ровно в исходный угол
-                doDisassemble();
-                return;
-            }
+            advanceProfile();
         }
         super.tick();
     }
 
-    // Разборка НЕ резкая: если корона ещё крутится и торможение не запущено — запускаем плавное
-    // торможение (линейно до нуля за ~rampTicks) и синхронизируем его на клиент; сама разборка
-    // сработает в tick, когда докрутит.
-    @Override
-    public void disassemble() {
-        if (brakeTicks < 0 && running && movedContraption != null && Math.abs(easedAngularSpeed) > 0.1F) {
-            // Тормозим так, чтобы ОСТАНОВИТЬСЯ РОВНО В ИСХОДНОМ ПОЛОЖЕНИИ (угол 0), а не встать где
-            // попало и потом резко доснапиться при разборке. Считаем путь до нуля в текущем направлении
-            // и добираем целые обороты, чтобы торможение длилось примерно rampTicks: при линейном
-            // замедлении путь = v0*N/2, отсюда шаг = v0²/(2*путь). Итог: бур плавно докручивается и
-            // замирает на исходном угле, а setAngle(0) при разборке уже ничего не двигает.
-            float v0 = Math.abs(easedAngularSpeed);
-            int dir = easedAngularSpeed >= 0 ? 1 : -1;
-            float a = ((angle % 360.0F) + 360.0F) % 360.0F;
-            float remaining = dir > 0 ? (360.0F - a) % 360.0F : a;
-            int n = Math.max(1, rampTicks());
-            int turns = Math.max(0, Math.round((v0 * n / 2.0F - remaining) / 360.0F));
-            float dist = remaining + 360.0F * turns;
-            if (dist < 1.0F) {
-                doDisassemble(); // уже практически в исходном
-                return;
+    /*
+     * Серверный ход профиля. Возвращает true, если подшипник в этом тике разобрался.
+     * Разгон гейтится по running: иначе скорость раскручивалась бы ещё до сборки (вал крутится
+     * вхолостую) и старт выглядел бы мгновенным.
+     */
+    private boolean serverProfileTick() {
+        if (!braking) {
+            float target = running ? SPEED_FACTOR * convertToAngular(getSpeed()) : 0.0F;
+            if (Math.abs(target - rampTarget) > TARGET_EPSILON) {
+                // Цель сменилась (пуск/стоп/другие обороты) — новая кривая ОТ ТЕКУЩЕЙ скорости,
+                // поэтому смена оборотов на ходу не даёт скачка.
+                rampStart = easedAngularSpeed;
+                rampTarget = target;
+                rampAge = 0;
+                rampLen = rampLengthFor(rampStart, target);
+                notifyUpdate(); // клиент должен узнать про новую кривую сразу, а не через 3 тика
             }
-            brakeStep = v0 * v0 / (2.0F * dist);
-            brakeRemaining = dist;
-            brakeDir = dir;
-            brakeTicks = (int) (2.0F * dist / v0) + 40; // страховочный предел
-            notifyUpdate(); // сказать клиенту, что пошло торможение
+        }
+        advanceProfile();
+        if (braking) {
+            brakeGuard--;
+            if (brakeRemaining <= BRAKE_ARRIVE_EPS || brakeGuard <= 0) {
+                angle = 0.0F; // приехали ровно в исходный угол
+                doDisassemble();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /*
+     * Один шаг профиля. Считается ОДИНАКОВО на сервере и на клиенте из одних и тех же (синхронных)
+     * параметров, поэтому стороны не расходятся, а приходящий раз в 3 тика пакет их лишь подравнивает.
+     */
+    private void advanceProfile() {
+        if (braking) {
+            if (brakeAge < brakeCoast + brakeLen + BRAKE_GUARD_TICKS) {
+                brakeAge++;
+            }
+            // Выбег на постоянной скорости, затем спад по S-кривой длиной ровно rampTicks().
+            float mag = brakeAge <= brakeCoast
+                    ? brakeV0
+                    : brakeV0 * (1.0F - smoothstep((brakeAge - brakeCoast) / (float) Math.max(1, brakeLen)));
+            if (brakeRemaining > BRAKE_ARRIVE_EPS) {
+                mag = Math.max(mag, Math.min(BRAKE_CRAWL, brakeRemaining)); // доползти, а не замереть раньше
+            }
+            mag = Math.min(mag, Math.max(0.0F, brakeRemaining));            // не проскочить исходный угол
+            easedAngularSpeed = brakeDir * mag;
+            brakeRemaining -= mag;
             return;
         }
-        doDisassemble();
+        if (rampAge < rampLen) {
+            rampAge++;
+        }
+        easedAngularSpeed = rampStart + (rampTarget - rampStart) * smoothstep(rampAge / (float) Math.max(1, rampLen));
+    }
+
+    /*
+     * Разборка НЕ резкая: если корона ещё крутится — запускаем плавное торможение с докруткой ровно
+     * в исходный угол, а сама разборка сработает в tick, когда путь исчерпан.
+     * Родитель зовёт этот метод из трёх мест: ПКМ игрока, потеря оборотов (SU) и снос блока.
+     * Снос блока обязан разбирать МГНОВЕННО — BE вот-вот перестанет тикать и докручивать будет некому.
+     */
+    @Override
+    public void disassemble() {
+        if (removing || level == null || level.isClientSide) {
+            doDisassemble();
+            return;
+        }
+        if (braking) {
+            return; // уже тормозим; повторный ПКМ не рвёт торможение и не разбирает на полном ходу
+        }
+        if (!running || movedContraption == null || Math.abs(easedAngularSpeed) <= MIN_BRAKE_SPEED) {
+            doDisassemble();
+            return;
+        }
+        // Тормозим так, чтобы ОСТАНОВИТЬСЯ РОВНО В ИСХОДНОМ ПОЛОЖЕНИИ (угол 0), а не встать где
+        // попало и потом резко доснапиться при разборке. Спад всегда длится rampTicks() — столько
+        // же, сколько разгон, поэтому останов ощущается зеркально пуску. Сам спад накрывает
+        // v0*n/2 градусов; если до исходного угла дальше, добираем целые обороты, а остаток
+        // (меньше одного оборота) проходим выбегом на постоянной скорости ПЕРЕД спадом.
+        float v0 = Math.abs(easedAngularSpeed);
+        int dir = easedAngularSpeed >= 0 ? 1 : -1;
+        float a = ((angle % 360.0F) + 360.0F) % 360.0F;
+        float remaining = dir > 0 ? (360.0F - a) % 360.0F : a;
+        int n = Math.max(1, rampTicks());
+        float decelDist = v0 * n / 2.0F;
+        int turns = Math.max(0, (int) Math.ceil((decelDist - remaining) / 360.0F));
+        float dist = remaining + 360.0F * turns;
+        if (dist < 1.0F) {
+            doDisassemble(); // уже практически в исходном
+            return;
+        }
+        braking = true;
+        brakeV0 = v0;
+        brakeCoast = Math.max(0, Math.round((dist - decelDist) / v0));
+        brakeLen = n;
+        brakeAge = 0;
+        brakeRemaining = dist;
+        brakeDir = dir;
+        brakeGuard = brakeCoast + brakeLen + BRAKE_GUARD_TICKS;
+        notifyUpdate(); // сказать клиенту, что пошло торможение
+    }
+
+    // Блок сносят. Родительский remove() зовёт disassemble() — флаг говорит ему не тормозить.
+    @Override
+    public void remove() {
+        removing = true;
+        super.remove();
     }
 
     @Override
     public void write(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
         super.write(tag, registries, clientPacket);
+        tag.put("CrownBuffer", getBuffer().serializeNBT(registries));
         if (clientPacket) {
-            tag.putBoolean("CrownBraking", brakeTicks >= 0);
-            tag.putFloat("CrownBrakeStep", brakeStep);
+            tag.putFloat("CrownRampStart", rampStart);
+            tag.putFloat("CrownRampTarget", rampTarget);
+            tag.putInt("CrownRampLen", rampLen);
+            tag.putInt("CrownRampAge", rampAge);
+            tag.putBoolean("CrownBraking", braking);
+            tag.putFloat("CrownBrakeV0", brakeV0);
+            tag.putInt("CrownBrakeCoast", brakeCoast);
+            tag.putInt("CrownBrakeLen", brakeLen);
+            tag.putInt("CrownBrakeAge", brakeAge);
             tag.putFloat("CrownBrakeLeft", brakeRemaining);
             tag.putInt("CrownBrakeDir", brakeDir);
         }
@@ -136,23 +287,49 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
     @Override
     protected void read(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
+        if (tag.contains("CrownBuffer")) {
+            getBuffer().deserializeNBT(registries, tag.getCompound("CrownBuffer"));
+        }
         if (clientPacket) {
-            clientBraking = tag.getBoolean("CrownBraking");
-            brakeStep = tag.getFloat("CrownBrakeStep");
+            rampStart = tag.getFloat("CrownRampStart");
+            rampTarget = tag.getFloat("CrownRampTarget");
+            rampLen = Math.max(1, tag.getInt("CrownRampLen"));
+            rampAge = tag.getInt("CrownRampAge");
+            braking = tag.getBoolean("CrownBraking");
+            brakeV0 = tag.getFloat("CrownBrakeV0");
+            brakeCoast = Math.max(0, tag.getInt("CrownBrakeCoast"));
+            brakeLen = Math.max(1, tag.getInt("CrownBrakeLen"));
+            brakeAge = tag.getInt("CrownBrakeAge");
             brakeRemaining = tag.getFloat("CrownBrakeLeft");
             brakeDir = tag.getInt("CrownBrakeDir");
+            // Пересчитать скорость сразу по свежим параметрам: иначе один тик рисовался бы по старым.
+            if (braking) {
+                float mag = brakeAge <= brakeCoast
+                        ? brakeV0
+                        : brakeV0 * (1.0F - smoothstep((brakeAge - brakeCoast) / (float) brakeLen));
+                easedAngularSpeed = brakeDir * Math.min(mag, Math.max(0.0F, brakeRemaining));
+            } else {
+                easedAngularSpeed = rampStart + (rampTarget - rampStart) * smoothstep(rampAge / (float) rampLen);
+            }
         }
     }
 
     private void doDisassemble() {
-        brakeTicks = -1;
-        brakeStep = 0.0F;
+        braking = false;
+        brakeV0 = 0.0F;
+        brakeCoast = 0;
+        brakeAge = 0;
         brakeRemaining = 0.0F;
-        clientBraking = false;
+        brakeGuard = 0;
+        rampStart = 0.0F;
+        rampTarget = 0.0F;
+        rampAge = 0;
+        rampLen = 1;
+        easedAngularSpeed = 0.0F;
         if (movedContraption != null) {
             movedContraption.setAngle(0.0F); // парковка в исходную ориентацию
         }
-        super.disassemble();
+        super.disassemble(); // внутри sendData() — клиент получит уже сброшенный профиль
     }
 
     // Убираем прокручиваемую настройку «Режим движения», унаследованную от подшипника Create:
@@ -165,6 +342,65 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity {
         if (movementMode != null) {
             behaviours.remove(movementMode);
         }
+    }
+
+    // ── Буфер и подключение к движку бурения Offroad ──
+    //
+    // Породу МЫ не ломаем. Движок Offroad — общий сервис: любой блок, который представится ему
+    // поставщиком, может сказать «вот эти позиции надо выгрызть». Движок сам копит прогресс, сам
+    // рисует трещины, сам ломает и сам возвращает нам каждый выпавший стак. Наше дело — решить,
+    // ЧТО грызть (своя геометрия), и принять дроп.
+    //
+    // Заморозка при полном буфере получается сама: движок каждый тик спрашивает «ты ещё активен?»,
+    // и отрицательный ответ снимает наши заявки. Прогресс разрушения не идёт, блоки не ломаются,
+    // на землю ничего не падает. Освободился буфер — грызня продолжается.
+
+    public CrownBufferHandler getBuffer() {
+        if (buffer == null) {
+            boolean sturdy = getBlockState().getBlock() == BlockRegistry.CROWN_BEARING_STURDY.get();
+            int slots = sturdy ? ModConfig.BEARING_BUFFER_STURDY.get() : ModConfig.BEARING_BUFFER_ANDESITE.get();
+            buffer = new CrownBufferHandler(slots);
+        }
+        return buffer;
+    }
+
+    // Активен ли бур с точки зрения движка. Полный буфер сюда входит намеренно — это и есть
+    // заморозка. Торможение тоже: докручиваясь в исходный угол, бур уже не грызёт.
+    @Override
+    public boolean isActive() {
+        return running
+                && !braking
+                && !isRemoved()
+                && getSpeed() != 0.0F
+                && getBuffer().hasSpace();
+    }
+
+    // Кто заказал грызню — движок по этой позиции адресует клиенту показ трещин.
+    @Override
+    public BlockPos getLocation() {
+        return isActive() ? worldPosition : null;
+    }
+
+    // Темп грызни одного блока. Движок делит его на твёрдость и копит, пока не наберётся порог.
+    // Берём скорость вала, а не скорость профиля: профиль — это про то, как бур ВЫГЛЯДИТ.
+    @Override
+    public float getBreakingSpeed(Level level, BlockPos pos, BlockState state) {
+        if (!isActive()) {
+            return 0.0F;
+        }
+        return (float) Mth.clamp(Math.abs(getSpeed()) / BREAK_SPEED_DIVISOR, 0.01, 16.0);
+    }
+
+    // Дроп сломанного блока. Что не влезло — движок предложит другим заказчикам, а потом уронит
+    // на землю. Но до этого не дойдёт: полный буфер гасит isActive() и ломать перестают заранее.
+    @Override
+    public void itemCallback(ItemStack stack) {
+        if (stack.isEmpty()) {
+            return;
+        }
+        ItemStack rest = getBuffer().internalInsert(stack.copy());
+        stack.setCount(rest.getCount());
+        setChanged();
     }
 
     // Нагрузка (SU за единицу скорости) по стороне короны. Крутить прямо тут. - TUNE

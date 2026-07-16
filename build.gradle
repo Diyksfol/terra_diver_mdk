@@ -42,6 +42,7 @@ repositories {
     maven { url = "https://maven.createmod.net" }       // Create, Ponder, Flywheel
     maven { url = "https://mvn.devos.one/snapshots" }    // Registrate
     maven { url = "https://maven.blamejared.com/" }      // JEI (позже, для JEI-плагина)
+    flatDir { dirs 'libs' }                              // Sable/Aeronautics — локальные jar-ы
 }
 
 base {
@@ -158,6 +159,12 @@ dependencies {
     compileOnly("dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     implementation("com.tterrag.registrate:Registrate:${registrate_version}")
+
+    // Sable / Aeronautics / Offroad / simulated — ТОЛЬКО для компиляции.
+    // В dev-мире не запускаются: сборка тестируется в инстансе CurseForge, где эти моды уже стоят,
+    // поэтому runtime-зависимость не нужна, а в jar мода они не попадут.
+    // Положить в libs/ (см. libs/README.txt — какие jar-ы и откуда достать).
+    compileOnly fileTree(dir: 'libs', include: ['*.jar'])
 }
 
 test {

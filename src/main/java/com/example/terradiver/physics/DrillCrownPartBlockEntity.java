@@ -28,7 +28,6 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
 
     private VoxelShape cachedShape; // ленивый кэш
     private Direction cachedFacing;  // при какой ориентации собран кэш
-    private int cachedRoll = -1;     // при каком крене собран кэш
     private BlockPos cachedShapeMaster; // от какого мастера считался октант
 
     public DrillCrownPartBlockEntity(BlockPos pos, BlockState state) {
@@ -127,15 +126,13 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
         // становится чужим — отсюда «блоки на местах, но повёрнуты не туда». Мастера ищем обходом
         // (getMaster), поэтому работает и в сублевеле Sable. Кэш — по паре (сторона, крен).
         Direction f = currentFacing();
-        int r = currentRoll();
         BlockPos m = getMaster();
-        if (cachedShape == null || f != cachedFacing || r != cachedRoll || !m.equals(cachedShapeMaster)) {
+        if (cachedShape == null || f != cachedFacing || !m.equals(cachedShapeMaster)) {
             cachedShapeMaster = m;
             int[] o = geometricOffset(f);
             cachedShape = CrownShapes.build(
-                DrillCrownStructure.cellShapeBoxes(size, o[0], o[1], o[2]), f, r);
+                DrillCrownStructure.cellShapeBoxes(size, o[0], o[1], o[2]), f);
             cachedFacing = f;
-            cachedRoll = r;
         }
         return cachedShape;
     }
@@ -148,17 +145,6 @@ public class DrillCrownPartBlockEntity extends BlockEntity {
                 worldPosition.getY() - m.getY(),
                 worldPosition.getZ() - m.getZ());
         return o != null ? o : new int[]{ ox, oy, oz };
-    }
-
-    // Крен мастера (0..3); если мастера нет — 0.
-    private int currentRoll() {
-        if (level != null) {
-            BlockState ms = level.getBlockState(getMaster());
-            if (ms.getBlock() instanceof DrillCrownBlock) {
-                return ms.getValue(DrillCrownBlock.ROLL);
-            }
-        }
-        return 0;
     }
 
     // Текущая сторона мастера (если он на месте), иначе — сохранённая при постройке.

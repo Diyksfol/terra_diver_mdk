@@ -13,7 +13,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
-import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -30,10 +29,6 @@ import java.util.Map;
 public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Master {
 
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
-    // Крен короны вокруг оси бура, шагами 90° (0..3). Для ВЕРТИКАЛЬНОГО бура (FACING вверх/вниз)
-    // поворот вокруг Y невыразим через FACING — это крен, и он пишется сюда (см. rotate). Модель
-    // проворачивается по нему через blockstate; коллизия ведомых follows фактические позиции.
-    public static final IntegerProperty ROLL = IntegerProperty.create("roll", 0, 3);
 
     // Спецформа острия 1x1 (модельная ориентация, глубина +Y): низ полный + центр-полублок сверху.
     // Острие 1x1: один куб 8x8x8 px по центру в нижней части блока (модельная ориентация).
@@ -41,34 +36,30 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     private static final double[][] FULL_CUBE = {{0.0, 0.0, 0.0, 1.0, 1.0, 1.0}};
 
     private final String size;
-    private final Map<Direction, VoxelShape[]> shapes;
+    private final Map<Direction, VoxelShape> shapes;
 
     public DrillCrownBlock(Properties properties, String size) {
         super(properties);
         this.size = size;
         double[][] base = "1x1".equals(size) ? TIP_BASE : FULL_CUBE; // NxN мастер-ячейка — полный куб
-        EnumMap<Direction, VoxelShape[]> m = new EnumMap<>(Direction.class);
+        EnumMap<Direction, VoxelShape> m = new EnumMap<>(Direction.class);
         for (Direction d : Direction.values()) {
-            VoxelShape[] byRoll = new VoxelShape[4];
-            for (int r = 0; r < 4; r++) {
-                byRoll[r] = CrownShapes.build(base, d, r); // крен: у полного куба — no-op, у 1x1 важен
-            }
-            m.put(d, byRoll);
+            m.put(d, CrownShapes.build(base, d));
         }
         this.shapes = m;
-        registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.UP).setValue(ROLL, 0));
+        registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.UP));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, ROLL);
+        builder.add(FACING);
     }
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         Direction face = context.getClickedFace();
         Direction facing = context.isSecondaryUseActive() ? face.getOpposite() : face;
-        return defaultBlockState().setValue(FACING, facing).setValue(ROLL, 0);
+        return defaultBlockState().setValue(FACING, facing);
     }
 
     // Когда корону двигает/поворачивает механика Create (разборка контраптии, склейка слизью,
@@ -78,24 +69,15 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     // vanilla Rotation — только вокруг вертикали (Y). Повороты вокруг горизонтальной оси (подшипник
     // смотрит вбок, физштуковина кренится) сюда не приходят готовым Rotation — их отрабатывает уже
     // самолечение ведомых: пересборка от мастера (см. DrillCrownMultiblock.buildParts) + вопрос к проверке.
+    // Поворот структуры чужой механикой (Create/Sable зовут state.rotate на каждом блоке).
+    // Для ГОРИЗОНТАЛЬНОГО бура меняется сторона (север→восток) — модель и коллизия следуют за ней.
+    // Для ВЕРТИКАЛЬНОГО (вверх/вниз) ванильный Rotation вокруг Y возвращает ту же сторону — и это
+    // ПРАВИЛЬНО: бур — тело вращения, поворот вокруг его собственной оси ничего не меняет ни в
+    // модели, ни в коллизии. Прежнее поле крена (ROLL) как раз и крутило коллизию вертикального
+    // бура на ровном месте («карусель»), поэтому убрано.
     @Override
     public BlockState rotate(BlockState state, Rotation rotation) {
-        Direction facing = state.getValue(FACING);
-        if (facing.getAxis() == Direction.Axis.Y) {
-            // Вертикальный бур: поворот вокруг Y = КРЕН вокруг оси бура, FACING (вверх/вниз) неизменен.
-            // Пишем в ROLL, чтобы модель провернулась вместе со структурой, а не осталась смотреть
-            // «как была». Шаг = столько CLOCKWISE_90, сколько в rotation. Так крен, наложенный Sable
-            // (она зовёт state.rotate этим же Rotation), захватывается прямо здесь — выводить не нужно.
-            int add = switch (rotation) {
-                case CLOCKWISE_90 -> 1;
-                case CLOCKWISE_180 -> 2;
-                case COUNTERCLOCKWISE_90 -> 3;
-                default -> 0;
-            };
-            return state.setValue(ROLL, (state.getValue(ROLL) + add) & 3);
-        }
-        // Горизонтальный бур: обычный поворот стороны (север→восток), крен не задействован.
-        return state.setValue(FACING, rotation.rotate(facing));
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
     }
 
     @Override
@@ -121,7 +103,7 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext ctx) {
-        return shapes.get(state.getValue(FACING))[state.getValue(ROLL) & 3];
+        return shapes.get(state.getValue(FACING));
     }
 
     // Не затеняем соседей: корона не блокирует небесный свет, иначе блок под мастером уходит в тень
@@ -171,9 +153,6 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
             // или побиться (октанты не те, часть заменилась полными блоками, недетерминизм). Раз мастер
             // корректен — ПЕРЕСОБИРАЕМ ведомых от него с нуля: buildParts перезаписывает ячейки свежими
             // блоками с правильными данными. Это надёжнее и детерминированнее починки по одной ячейке.
-            org.slf4j.LoggerFactory.getLogger("terra_diver-heal").info(
-                    "[TD-rebuild] @ {} facing {} roll {} size {}",
-                    pos, now.getValue(FACING), now.getValue(ROLL), crown.crownSize());
             DrillCrownMultiblock.buildParts(level, pos, crown.crownSize(), now.getValue(FACING));
         }
     }

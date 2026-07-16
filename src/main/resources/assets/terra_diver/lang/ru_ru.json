@@ -34,7 +34,9 @@
   "item.terra_diver.incomplete_drill_module": "Незаконченный буровой модуль",
   "itemGroup.terra_diver.terra_diver_tab": "Terra Diver",
   "tooltip.terra_diver.crown_bearing": "Сборка бура: поставьте перед подшипником хотя бы одну корону и кликните по нему ПКМ пустой рукой.",
-  "hint.terra_diver.crown_bearing.title": "Сборка бура",
+  "hint.terra_diver.crown_bearing.title": "Сборка бура:",
   "hint.terra_diver.crown_bearing.line1": "ПКМ пустой рукой. Нужна хотя бы",
-  "hint.terra_diver.crown_bearing.line2": "одна корона перед подшипником."
+  "hint.terra_diver.crown_bearing.line2": "одна корона перед подшипником.",
+  "msg.terra_diver.crown_no_space": "Буру %s не хватает места",
+  "msg.terra_diver.crown_blocked_entity": "Буру %s мешает существо"
 }
