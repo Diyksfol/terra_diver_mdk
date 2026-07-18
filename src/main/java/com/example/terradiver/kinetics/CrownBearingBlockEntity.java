@@ -215,6 +215,13 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         if (braking) {
             brakeGuard--;
             if (brakeRemaining <= BRAKE_ARRIVE_EPS || brakeGuard <= 0) {
+                // Диагностика недокрута: сравнить фактический накрученный угол с целевой парковкой.
+                // TODO снять после отладки торможения.
+                float actual = ((angle % 360.0F) + 360.0F) % 360.0F;
+                org.slf4j.LoggerFactory.getLogger("terra_diver").info(
+                        "[brake] parkAngle={} actualAngle={} остаток={} причина={}",
+                        String.format("%.1f", parkAngle), String.format("%.1f", actual),
+                        String.format("%.2f", brakeRemaining), brakeGuard <= 0 ? "GUARD" : "remaining");
                 angle = parkAngle; // приехали ровно в парковку
                 doDisassemble();
                 return true;
@@ -535,6 +542,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         // половина перебора уходит назад и вбок мимо цели, а вперёд достаёт лишь один слой.
         Vec3 zoneCenter = center.add(axis.scale((front0 + front1) * 0.5));
         BlockPos origin = BlockPos.containing(zoneCenter);
+        int ordered = 0;
         for (int dx = -box; dx <= box; dx++) {
             for (int dy = -box; dy <= box; dy++) {
                 for (int dz = -box; dz <= box; dz++) {
@@ -552,8 +560,20 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
                         continue; // воздух, жидкости и непробиваемое не заказываем
                     }
                     MultiMiningServerManager.addOrRefreshPos(level, target, this);
+                    ordered++;
                 }
             }
+        }
+        // Диагностика зоны бурения (раз в секунду): реальные координаты центра короны, направление
+        // оси и сколько блоков заказано. Если ordered=0 при породе перед буром — ось/центр мимо.
+        // TODO снять после отладки бурения.
+        if (level.getGameTime() % 20L == 0L) {
+            org.slf4j.LoggerFactory.getLogger("terra_diver").info(
+                    "[dig] side={} center=({},{},{}) axis=({},{},{}) zone=({},{},{}) заказано={}",
+                    side,
+                    String.format("%.1f", center.x), String.format("%.1f", center.y), String.format("%.1f", center.z),
+                    String.format("%.2f", axis.x), String.format("%.2f", axis.y), String.format("%.2f", axis.z),
+                    origin.getX(), origin.getY(), origin.getZ(), ordered);
         }
     }
 
