@@ -115,6 +115,12 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     // Если до ближайшей парковки ближе этого — просто доснапить: на глаз такой доворот не виден.
     // Это же чинит «запустил и сразу остановил»: бур не успел провернуться, снап незаметен.
     private static final float PARK_SNAP = 15.0F;
+    // Скорость, ниже которой бур считается «ползущим»: если он при этом рядом с четвертью — снапим
+    // (п.4, «запустил и сразу стоп»). Выше MIN_BRAKE_SPEED, чтобы это был именно медленный доворот,
+    // а не полный ход. - TUNE
+    private static final float SNAP_SPEED = 1.0F;
+    // Во сколько раз внешне замедляется вращение при полном буфере (косметика, п.13). - TUNE
+    private static final float BUFFER_FULL_SLOWDOWN = 0.6F;
 
     // Куда паркуемся в этой разборке. Считает сервер в disassemble().
     private float parkAngle = 0.0F;
@@ -192,7 +198,23 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     private boolean serverProfileTick() {
         if (!braking) {
             float target = running ? SPEED_FACTOR * convertToAngular(getSpeed()) : 0.0F;
-            if (Math.abs(target - rampTarget) > TARGET_EPSILON) {
+            // Переезд между обычным миром и физичным кораблём пересоздаёт блок-сущность: running и
+            // обороты Create восстанавливает, но наш профиль стартует с нуля. Без этой ветки первый
+            // тик увидел бы «цель есть, скорость 0» и запустил бы ПОЛНЫЙ разгон заново — это и есть
+            // «подшипник расскручивается заново» в обе стороны перехода. Признак переезда: бур уже
+            // собран и должен крутиться, но профиль пуст и разгон не идёт. Телепортируем скорость на
+            // цель без кривой — переход бесшовный.
+            boolean assembledButBlank = running && movedContraption != null
+                    && Math.abs(easedAngularSpeed) < TARGET_EPSILON
+                    && rampAge >= rampLen
+                    && Math.abs(target) > TARGET_EPSILON;
+            if (assembledButBlank) {
+                easedAngularSpeed = target;
+                rampStart = target;
+                rampTarget = target;
+                rampAge = rampLen;
+                notifyUpdate();
+            } else if (Math.abs(target - rampTarget) > TARGET_EPSILON) {
                 // Цель сменилась (пуск/стоп/другие обороты) — новая кривая ОТ ТЕКУЩЕЙ скорости,
                 // поэтому смена оборотов на ходу не даёт скачка.
                 rampStart = easedAngularSpeed;
@@ -240,6 +262,12 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             rampAge++;
         }
         easedAngularSpeed = rampStart + (rampTarget - rampStart) * smoothstep(rampAge / (float) Math.max(1, rampLen));
+        // Косметика (как у бурильного колеса Offroad): при полном буфере бур внешне чуть замедляется —
+        // визуальный сигнал «забился». Грызня и так стоит (isActive=false из-за полного буфера), это
+        // только про то, как крутится модель. Множитель на скорости профиля, стресс-сеть не трогаем.
+        if (level != null && !level.isClientSide && running && !getBuffer().hasSpace()) {
+            easedAngularSpeed *= BUFFER_FULL_SLOWDOWN;
+        }
     }
 
     /*
@@ -270,12 +298,14 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         int dir = easedAngularSpeed >= 0 ? 1 : -1;
         float a = ((angle % 360.0F) + 360.0F) % 360.0F;
 
-        // Мгновенный снап — ТОЛЬКО когда бур ещё почти не крутится (запустил и сразу остановил): тогда
-        // тормозить нечего, доводим до ближайшей четверти сразу. Раньше условие было по БЛИЗОСТИ угла
-        // к четверти — и ловило нормально раскрученный бур, если тот в момент ПКМ случайно оказался у
-        // 90/180/270, давая «мгновенную остановку». Теперь смотрим на скорость, а не на угол.
-        if (v0 <= MIN_BRAKE_SPEED) {
-            float nearest = Math.round(a / PARK_STEP) * PARK_STEP;
+        // Мгновенный снап — когда тормозить фактически нечего: бур либо почти встал, либо едва
+        // тронулся и уже рядом с четвертью. Оба условия ТРЕБУЮТ малой скорости, поэтому раскрученный
+        // на полном ходу бур у четверти (п.5) сюда НЕ попадает и тормозится плавно, а «запустил и
+        // сразу стоп» (п.4) — попадает и снапится. Разводит их именно скорость, а не только угол.
+        float nearest = Math.round(a / PARK_STEP) * PARK_STEP;
+        boolean almostStopped = v0 <= MIN_BRAKE_SPEED;
+        boolean creepingNearQuarter = v0 <= SNAP_SPEED && Math.abs(a - nearest) <= PARK_SNAP;
+        if (almostStopped || creepingNearQuarter) {
             parkAngle = ((nearest % 360.0F) + 360.0F) % 360.0F;
             angle = parkAngle;
             doDisassemble();
@@ -488,21 +518,25 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         axis = axis.normalize();
 
         double radius = side / 2.0 + CROWN_RADIUS_MARGIN;
-        // Окно вдоль оси вынесено ВПЕРЁД от плоскости короны, а не симметрично вокруг неё. Раньше
-        // back=-0.75 давал зону, наполовину лежащую В САМОМ буре — отсюда «копает только у основания».
-        // Теперь назад заходим лишь на пол-блока (плоскость резцов), а вперёд — на всю глубину REACH.
-        double back = -0.5;
-        double front = CROWN_REACH + 0.5;
-        int box = (int) Math.ceil(radius + CROWN_REACH) + 1;
+        // Окно вдоль оси вынесено ЦЕЛИКОМ ВПЕРЁД от короны. Мастер физически сидит в контраптии, а
+        // грызть надо породу ПЕРЕД ним, не его собственную клетку. Раньше окно [-0.5, REACH+0.5]
+        // почти всё лежало в самом буре — отсюда «спереди не копает, копает внутри себя». Теперь от
+        // передней грани короны (полблока от центра) и на глубину REACH вперёд, с запасом полблока.
+        double front0 = 0.5;                     // передняя грань клетки короны
+        double front1 = 0.5 + CROWN_REACH + 0.5; // и вперёд на всю глубину + запас
+        int box = (int) Math.ceil(radius + front1) + 1;
 
-        BlockPos origin = BlockPos.containing(center);
+        // Куб смещений центрируем на СЕРЕДИНУ зоны грызни (перед короной), а не на мастера: иначе
+        // половина перебора уходит назад и вбок мимо цели, а вперёд достаёт лишь один слой.
+        Vec3 zoneCenter = center.add(axis.scale((front0 + front1) * 0.5));
+        BlockPos origin = BlockPos.containing(zoneCenter);
         for (int dx = -box; dx <= box; dx++) {
             for (int dy = -box; dy <= box; dy++) {
                 for (int dz = -box; dz <= box; dz++) {
                     BlockPos target = origin.offset(dx, dy, dz);
                     Vec3 d = target.getCenter().subtract(center);
                     double along = d.dot(axis);
-                    if (along < back || along > front) {
+                    if (along < front0 || along > front1) {
                         continue;
                     }
                     if (d.subtract(axis.scale(along)).lengthSqr() > radius * radius) {

@@ -100,16 +100,16 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
 
     @Override
     public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
-        // Сломали мастера в выживании → выронить один предмет короны (структура снесётся в onRemove).
-        if (!level.isClientSide && !player.getAbilities().instabuild) {
-            DrillCrownMultiblock.dropCrownItem(level, pos);
-            // Пометить, что предмет уже выпал: страховочный дроп в onRemove для этого пути НЕ должен
-            // сработать, иначе на одно ломание — два предмета. Флаг снимается в самом onRemove.
-            DrillCrownMultiblock.markDroppedByPlayer();
-        }
-        // Сбросить прогресс ломания по ВСЕМ ячейкам короны, иначе при повторной установке на то же
-        // место блок появляется «с трещинами» (клиент держит старый прогресс до первого ЛКМ).
         if (!level.isClientSide) {
+            // В выживании роняем ровно один предмет короны. В креативе НЕ роняем. В обоих случаях
+            // помечаем, что ломание обработал игрок, — тогда страховочный дроп в onRemove не сработает.
+            // Раньше в креативе флаг не ставился, и страховка роняла предмет вопреки правилам креатива.
+            if (!player.getAbilities().instabuild) {
+                DrillCrownMultiblock.dropCrownItem(level, pos);
+            }
+            DrillCrownMultiblock.markDroppedByPlayer();
+            // Сбросить прогресс ломания по ВСЕМ ячейкам короны, иначе при повторной установке на то же
+            // место блок появляется «с трещинами» (клиент держит старый прогресс до первого ЛКМ).
             for (BlockPos cell : DrillCrownStructure.worldCells(crownSize(), state.getValue(FACING), pos)) {
                 level.destroyBlockProgress(player.getId(), cell, -1);
             }
