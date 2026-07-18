@@ -114,17 +114,21 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
 
     @Override
     public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
-        // Сломали часть в выживании → выронить один предмет короны у мастера.
+        // Сломали часть в выживании → выронить один предмет короны у мастера. В креативе не роняем,
+        // но в обоих случаях помечаем позицию мастера как «обработана игроком», чтобы страховочный
+        // дроп в onRemove (для слома НЕ игроком) здесь не сработал и не дал второй предмет.
         if (!level.isClientSide && level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
+            BlockPos masterPos = be.getMaster();
             if (!player.getAbilities().instabuild) {
-                DrillCrownMultiblock.dropCrownItem(level, be.getMaster());
+                DrillCrownMultiblock.dropCrownItem(level, masterPos);
             }
+            DrillCrownMultiblock.markPlayerHandled(masterPos);
             // Сбросить прогресс ломания по всей короне (для остальных игроков; локальному — гасим при
             // установке, см. DrillCrownBlock.onPlace). Ведомые видны как коллизия по краям, поэтому
             // ломают часто именно их.
-            BlockState ms = level.getBlockState(be.getMaster());
+            BlockState ms = level.getBlockState(masterPos);
             if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {
-                for (BlockPos cell : DrillCrownStructure.worldCells(m.crownSize(), m.crownFacing(ms), be.getMaster())) {
+                for (BlockPos cell : DrillCrownStructure.worldCells(m.crownSize(), m.crownFacing(ms), masterPos)) {
                     level.destroyBlockProgress(player.getId(), cell, -1);
                 }
             }
@@ -139,9 +143,19 @@ public class DrillCrownPartBlock extends Block implements EntityBlock {
         // Create (захват всей короны) — сносить структуру НЕ надо.
         if (!moved && !state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
             if (level.getBlockEntity(pos) instanceof DrillCrownPartBlockEntity be) {
-                BlockState ms = level.getBlockState(be.getMaster());
+                BlockPos masterPos = be.getMaster();
+                BlockState ms = level.getBlockState(masterPos);
                 if (ms.getBlock() instanceof DrillCrownMultiblock.Master m) {
-                    DrillCrownMultiblock.dissolve(level, be.getMaster(), m.crownSize(), m.crownFacing(ms), ms);
+                    DrillCrownMultiblock.dissolve(level, masterPos, m.crownSize(), m.crownFacing(ms), ms);
+                    // Страховка от исчезновения при сломе НЕ игроком (другой мод, поршень, взрыв):
+                    // ведомую сломали, а мастер ещё в мире — роняем предмет короны у мастера. Игрок
+                    // роняет его сам в playerWillDestroy и помечает позицию мастера, поэтому здесь для
+                    // его пути дроп не дублируется. Без этой ветки слом ведомой чужим модом уносил
+                    // корону бесследно (мастер выпадал, ведомая — нет).
+                    if (!level.isClientSide && !DrillCrownMultiblock.wasPlayerHandled(masterPos)) {
+                        DrillCrownMultiblock.dropCrownItem(level, masterPos, ms);
+                    }
+                    DrillCrownMultiblock.clearPlayerHandled(masterPos);
                 }
             }
         }

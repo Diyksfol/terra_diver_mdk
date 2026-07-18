@@ -40,4 +40,28 @@ public class CrownBearingBlock extends MechanicalBearingBlock {
     public BlockEntityType<? extends MechanicalBearingBlockEntity> getBlockEntityType() {
         return BlockEntityRegistry.CROWN_BEARING.get();
     }
+
+    // При сломе подшипника высыпаем содержимое буфера крепления в мир — иначе выгрызенная порода
+    // пропадала вместе с блоком (и в выживании, и в креативе). Делаем в onRemove до вызова super,
+    // пока блок-сущность ещё жива и буфер доступен. Пропускаем, если блок просто сменил состояние
+    // (не снос) или его забрала контраптия (moved) — там буфер переезжает вместе с блоком.
+    @Override
+    public void onRemove(net.minecraft.world.level.block.state.BlockState state,
+                         net.minecraft.world.level.Level level,
+                         net.minecraft.core.BlockPos pos,
+                         net.minecraft.world.level.block.state.BlockState newState,
+                         boolean moved) {
+        if (!moved && !state.is(newState.getBlock()) && !level.isClientSide) {
+            if (level.getBlockEntity(pos) instanceof CrownBearingBlockEntity be) {
+                CrownBufferHandler buffer = be.getBuffer();
+                for (int slot = 0; slot < buffer.getSlots(); slot++) {
+                    net.minecraft.world.item.ItemStack stack = buffer.getStackInSlot(slot);
+                    if (!stack.isEmpty()) {
+                        net.minecraft.world.level.block.Block.popResource(level, pos, stack);
+                    }
+                }
+            }
+        }
+        super.onRemove(state, level, pos, newState, moved);
+    }
 }

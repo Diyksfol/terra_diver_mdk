@@ -25,6 +25,8 @@
     "terra_diver:drill_crown_11x11_iron",
     "terra_diver:drill_crown_11x11_brass",
     "terra_diver:drill_crown_11x11_netherite",
-    "terra_diver:drill_crown_part"
+    "terra_diver:drill_crown_part",
+    "terra_diver:crown_bearing_andesite",
+    "terra_diver:crown_bearing_sturdy"
   ]
 }

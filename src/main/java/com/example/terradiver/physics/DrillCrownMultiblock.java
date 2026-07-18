@@ -23,9 +23,11 @@ public final class DrillCrownMultiblock {
 
     private static final ThreadLocal<Boolean> DISSOLVING = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
-    // Помечает, что предмет короны уже выронен в playerWillDestroy (штатное ломание игроком). Тогда
-    // страховочный дроп в onRemove НЕ срабатывает — иначе на одно ломание падало бы два предмета (дюп).
-    private static final ThreadLocal<Boolean> DROPPED_BY_PLAYER = ThreadLocal.withInitial(() -> Boolean.FALSE);
+    // Позиция мастера, чьё ломание УЖЕ обработал игрок (выронил предмет в выживании либо законно
+    // не выронил в креативе). Страховочный дроп в onRemove для ЭТОЙ позиции не срабатывает — иначе
+    // дюп. Именно позиция, а не булев флаг: булев флаг мог зависнуть true от прошлого ломания игроком
+    // и глушить страховку при следующем сломе короны буром/модом (п.6) — тогда та не роняла предмет.
+    private static final ThreadLocal<BlockPos> PLAYER_HANDLED_POS = new ThreadLocal<>();
 
     // Частиц разрушения на ячейку у МУЛЬТИ-буров. Мало — чтобы большие короны (до 190 ячеек) не
     // выбрасывали сотни частиц разом. Бур 1x1 сюда не попадает — у него обычные ванильные частицы.
@@ -41,17 +43,20 @@ public final class DrillCrownMultiblock {
         return DISSOLVING.get();
     }
 
-    // Пометить/снять/проверить, что игрок уже уронил предмет при штатном ломании (защита от дюпа).
-    public static void markDroppedByPlayer() {
-        DROPPED_BY_PLAYER.set(Boolean.TRUE);
+    // Пометить, что ломание мастера в ЭТОЙ позиции обработал игрок (защита от дюпа именно здесь).
+    public static void markPlayerHandled(BlockPos pos) {
+        PLAYER_HANDLED_POS.set(pos.immutable());
     }
 
-    public static void clearDroppedByPlayer() {
-        DROPPED_BY_PLAYER.set(Boolean.FALSE);
+    // Обработал ли игрок ломание именно этой позиции (сравнение по координате, не липкий флаг).
+    public static boolean wasPlayerHandled(BlockPos pos) {
+        return pos.equals(PLAYER_HANDLED_POS.get());
     }
 
-    public static boolean wasDroppedByPlayer() {
-        return DROPPED_BY_PLAYER.get();
+    public static void clearPlayerHandled(BlockPos pos) {
+        if (pos.equals(PLAYER_HANDLED_POS.get())) {
+            PLAYER_HANDLED_POS.set(null);
+        }
     }
 
     /*

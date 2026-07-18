@@ -61,7 +61,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     private static final float TARGET_EPSILON = 0.001F; // мёртвая зона смены цели
     private static final float MIN_BRAKE_SPEED = 0.1F;  // ниже этой скорости тормозить нечего
     private static final float BRAKE_ARRIVE_EPS = 0.05F;// остаток пути, считающийся нулевым (градусы)
-    private static final float BRAKE_CRAWL = 0.3F;      // минимальный доводочный шаг, градусов/тик
+    private static final float BRAKE_CRAWL = 1.0F;      // минимальный доводочный шаг, градусов/тик
     private static final int BRAKE_GUARD_TICKS = 40;    // страховочный запас тиков сверх расчётного
 
     // Итоговая скорость профиля. Сервер её считает, клиент — воспроизводит по синхронизированным
@@ -103,9 +103,9 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     private static final float BREAK_SPEED_DIVISOR = 12.0F; // темп грызни; выше = медленнее
 
     // На сколько блоков вперёд от плоскости короны заглядываем. - TUNE
-    private static final double CROWN_REACH = 1.0;
-    // Запас радиуса сверх габарита короны, чтобы не тереться боками о стенки тоннеля. - TUNE
-    private static final double CROWN_RADIUS_MARGIN = 0.5;
+    private static final double CROWN_REACH = 0.5;
+    // Запас радиуса сверх габарита короны — обеспечивает боковой охват (грызём чуть шире короны).
+    private static final double CROWN_RADIUS_MARGIN = 0.6;
     // Ниже этой скорости грызть нечем — бур фактически стоит.
     private static final float MIN_DIG_SPEED = 0.05F;
 
@@ -120,7 +120,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     // а не полный ход. - TUNE
     private static final float SNAP_SPEED = 1.0F;
     // Во сколько раз внешне замедляется вращение при полном буфере (косметика, п.13). - TUNE
-    private static final float BUFFER_FULL_SLOWDOWN = 0.6F;
+    private static final float BUFFER_FULL_SLOWDOWN = 0.4F;
 
     // Куда паркуемся в этой разборке. Считает сервер в disassemble().
     private float parkAngle = 0.0F;
@@ -198,25 +198,11 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     private boolean serverProfileTick() {
         if (!braking) {
             float target = running ? SPEED_FACTOR * convertToAngular(getSpeed()) : 0.0F;
-            // Переезд между обычным миром и физичным кораблём пересоздаёт блок-сущность: running и
-            // обороты Create восстанавливает, но наш профиль стартует с нуля. Без этой ветки первый
-            // тик увидел бы «цель есть, скорость 0» и запустил бы ПОЛНЫЙ разгон заново — это и есть
-            // «подшипник расскручивается заново» в обе стороны перехода. Признак переезда: бур уже
-            // собран и должен крутиться, но профиль пуст и разгон не идёт. Телепортируем скорость на
-            // цель без кривой — переход бесшовный.
-            boolean assembledButBlank = running && movedContraption != null
-                    && Math.abs(easedAngularSpeed) < TARGET_EPSILON
-                    && rampAge >= rampLen
-                    && Math.abs(target) > TARGET_EPSILON;
-            if (assembledButBlank) {
-                easedAngularSpeed = target;
-                rampStart = target;
-                rampTarget = target;
-                rampAge = rampLen;
-                notifyUpdate();
-            } else if (Math.abs(target - rampTarget) > TARGET_EPSILON) {
+            if (Math.abs(target - rampTarget) > TARGET_EPSILON) {
                 // Цель сменилась (пуск/стоп/другие обороты) — новая кривая ОТ ТЕКУЩЕЙ скорости,
-                // поэтому смена оборотов на ходу не даёт скачка.
+                // поэтому смена оборотов на ходу не даёт скачка. При переезде между обычным миром и
+                // физичным кораблём профиль восстанавливается из NBT в read(), и там rampTarget уже
+                // равен цели — эта ветка НЕ срабатывает, разгон заново не запускается.
                 rampStart = easedAngularSpeed;
                 rampTarget = target;
                 rampAge = 0;
@@ -243,17 +229,16 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
      */
     private void advanceProfile() {
         if (braking) {
-            if (brakeAge < brakeCoast + brakeLen + BRAKE_GUARD_TICKS) {
+            if (brakeAge < brakeCoast + brakeLen) {
                 brakeAge++;
             }
-            // Выбег на постоянной скорости, затем спад по S-кривой длиной ровно rampTicks().
+            // Выбег на постоянной (подогнанной) скорости, затем спад по S-кривой длиной rampTicks().
+            // Скорость brakeV0 подобрана так, что суммарный путь = ровно расстояние до четверти,
+            // поэтому доползание crawl'ом больше не нужно — бур приходит точно, без клипа у четверти.
             float mag = brakeAge <= brakeCoast
                     ? brakeV0
                     : brakeV0 * (1.0F - smoothstep((brakeAge - brakeCoast) / (float) Math.max(1, brakeLen)));
-            if (brakeRemaining > BRAKE_ARRIVE_EPS) {
-                mag = Math.max(mag, Math.min(BRAKE_CRAWL, brakeRemaining)); // доползти, а не замереть раньше
-            }
-            mag = Math.min(mag, Math.max(0.0F, brakeRemaining));            // не проскочить исходный угол
+            mag = Math.min(mag, Math.max(0.0F, brakeRemaining)); // страховка: не проскочить четверть
             easedAngularSpeed = brakeDir * mag;
             brakeRemaining -= mag;
             return;
@@ -262,10 +247,12 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             rampAge++;
         }
         easedAngularSpeed = rampStart + (rampTarget - rampStart) * smoothstep(rampAge / (float) Math.max(1, rampLen));
-        // Косметика (как у бурильного колеса Offroad): при полном буфере бур внешне чуть замедляется —
+        // Косметика (как у бурильного колеса Offroad): при полном буфере бур внешне замедляется —
         // визуальный сигнал «забился». Грызня и так стоит (isActive=false из-за полного буфера), это
-        // только про то, как крутится модель. Множитель на скорости профиля, стресс-сеть не трогаем.
-        if (level != null && !level.isClientSide && running && !getBuffer().hasSpace()) {
+        // только про то, как крутится модель. Применяем на ОБЕИХ сторонах: клиент рисует вращение по
+        // своему профилю, поэтому только серверного замедления он бы не увидел (п.11). Буфер синкается,
+        // hasSpace одинаков на клиенте и сервере.
+        if (running && !getBuffer().hasSpace()) {
             easedAngularSpeed *= BUFFER_FULL_SLOWDOWN;
         }
     }
@@ -315,20 +302,30 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         float next = dir > 0
                 ? (float) (Math.floor(a / PARK_STEP) + 1.0) * PARK_STEP
                 : (float) (Math.ceil(a / PARK_STEP) - 1.0) * PARK_STEP;
-        parkAngle = ((next % 360.0F) + 360.0F) % 360.0F;
         float remaining = Math.abs(next - a);
         int n = Math.max(1, rampTicks());
-        float decelDist = v0 * n / 2.0F;
-        // Добираем ЧЕТВЕРТЯМИ, а не целыми оборотами: любая четверть — валидная парковка, поэтому
-        // незачем накидывать полный оборот там, где торможению не хватило пары десятков градусов.
-        // Целыми оборотами здесь получалось хуже, чем до парковки на четверть: до 450 градусов.
+        // Путь спада на единицу скорости — ТОЧНАЯ сумма (1 - smoothstep(i/n)) по тикам, а не
+        // приближение n/2. Именно замена интеграла приближением давала клип у четверти на десяток
+        // градусов: дискретная S-кривая проходит чуть меньше n/2, и пути не хватало.
+        float decayIntegral = 0.0F;
+        for (int i = 1; i <= n; i++) {
+            decayIntegral += 1.0F - smoothstep(i / (float) n);
+        }
+        float decelDist = v0 * decayIntegral;
+        // Добираем ЧЕТВЕРТЯМИ, а не целыми оборотами: любая четверть — валидная парковка.
         int steps = Math.max(0, (int) Math.ceil((decelDist - remaining) / PARK_STEP));
         float dist = remaining + PARK_STEP * steps;
-        parkAngle = ((parkAngle + dir * PARK_STEP * steps) % 360.0F + 360.0F) % 360.0F;
+        parkAngle = ((next + dir * PARK_STEP * steps) % 360.0F + 360.0F) % 360.0F;
+
+        // Точная посадка в четверть: путь = выбег (coast тиков на fitted) + спад (fitted*decayIntegral).
+        // Берём целое число тиков выбега и ПОДГОНЯЕМ стартовую скорость так, чтобы суммарный путь
+        // сошёлся ровно в dist. Тогда бур приходит на четверть без остатка и без доползания.
+        int coast = Math.max(0, (int) Math.floor((dist - v0 * decayIntegral) / v0));
+        float fitted = dist / (coast + decayIntegral);
 
         braking = true;
-        brakeV0 = v0;
-        brakeCoast = Math.max(0, Math.round((dist - decelDist) / v0));
+        brakeV0 = fitted;
+        brakeCoast = coast;
         brakeLen = n;
         brakeAge = 0;
         brakeRemaining = dist;
@@ -405,6 +402,14 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     }
 
     private void doDisassemble() {
+        // Если разборка застала бур ещё крутящимся (не доторможенным) — это резкий снос: снос блока,
+        // либо разборка контраптии при физикализации. Запоминаем скорость на пару тиков по позиции,
+        // чтобы пересобранный бур подхватил её и не разгонялся с нуля. Штатная остановка сюда приходит
+        // уже с нулевой скоростью (доторможенной), поэтому она память не засоряет и следующий обычный
+        // пуск стартует с нуля как надо.
+        if (level != null && !level.isClientSide && Math.abs(easedAngularSpeed) > MIN_BRAKE_SPEED) {
+            RecentSpeed.put(level, worldPosition, easedAngularSpeed);
+        }
         // Парковка (parkAngle) НЕ обнуляется здесь: он уже выставлен в disassemble() на ближайшую
         // кратную 90 четверть, и именно в ней контраптия должна собраться, чтобы коллизия блоков
         // легла ровно (Create кладёт блоки по ориентации; некратный угол разъезжается — это чинили
@@ -773,6 +778,21 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             return; // корон не найдено — крутить нечего, подшипник остаётся стоять
         }
         super.assemble();
+        // Физикализация/дефизикализация переносит машину через РАЗБОРКУ и мгновенную пересборку в
+        // другом уровне. Между ними блок-сущность пересоздаётся, и обычно профиль стартовал бы с нуля
+        // (бур заново разгоняется — это и был баг). Если ту же позицию только что покинул крутящийся
+        // бур, подхватываем его скорость и стартуем профиль сразу на ней, без разгона. Память живёт
+        // считанные тики и привязана к позиции, поэтому обычный пуск (никто недавно тут не крутился)
+        // её не видит и разгоняется штатно.
+        if (level != null && !level.isClientSide) {
+            Float carried = RecentSpeed.take(level, worldPosition);
+            if (carried != null && Math.abs(carried) > TARGET_EPSILON) {
+                easedAngularSpeed = carried;
+                rampStart = carried;
+                rampTarget = carried;
+                rampAge = rampLen;
+            }
+        }
     }
 
     // "9x9" -> 9

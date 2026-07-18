@@ -107,7 +107,7 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
             if (!player.getAbilities().instabuild) {
                 DrillCrownMultiblock.dropCrownItem(level, pos);
             }
-            DrillCrownMultiblock.markDroppedByPlayer();
+            DrillCrownMultiblock.markPlayerHandled(pos);
             // Сбросить прогресс ломания по ВСЕМ ячейкам короны, иначе при повторной установке на то же
             // место блок появляется «с трещинами» (клиент держит старый прогресс до первого ЛКМ).
             for (BlockPos cell : DrillCrownStructure.worldCells(crownSize(), state.getValue(FACING), pos)) {
@@ -210,11 +210,11 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
             // НЕ дублируем: пропускаем, если предмет уже выпал через ломание игроком, если игрок в
             // креативе (там дропа быть не должно) или если на месте появилась ДРУГАЯ корона (пересборка).
             if (!level.isClientSide
-                    && !DrillCrownMultiblock.wasDroppedByPlayer()
+                    && !DrillCrownMultiblock.wasPlayerHandled(pos)
                     && !(newState.getBlock() instanceof DrillCrownMultiblock.Master)) {
                 DrillCrownMultiblock.dropCrownItem(level, pos, state);
             }
-            DrillCrownMultiblock.clearDroppedByPlayer(); // снять флаг: следующий снос — с чистого листа
+            DrillCrownMultiblock.clearPlayerHandled(pos); // снять пометку: следующий снос — с чистого листа
         }
         super.onRemove(state, level, pos, newState, moved);
     }
