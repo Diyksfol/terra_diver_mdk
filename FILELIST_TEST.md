@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-07-18 07:44 UTC_
+_Обновлён: 2026-07-18 07:54 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -30,6 +30,7 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/navigation/package-info.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/navigation/package-info.java)
 - [src/main/java/com/example/terradiver/physics/AmbientSignal.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/AmbientSignal.java)
 - [src/main/java/com/example/terradiver/physics/CrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownBlock.java)
+- [src/main/java/com/example/terradiver/physics/CrownMaterial.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownMaterial.java)
 - [src/main/java/com/example/terradiver/physics/CrownShapes.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/CrownShapes.java)
 - [src/main/java/com/example/terradiver/physics/DrillCrownBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownBlock.java)
 - [src/main/java/com/example/terradiver/physics/DrillCrownItem.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/physics/DrillCrownItem.java)
