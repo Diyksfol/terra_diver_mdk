@@ -1,5 +1,5 @@
 # File List — Diyksfol/terra_diver_mdk
-_Обновлён: 2026-07-18 11:45 UTC_
+_Обновлён: 2026-07-18 13:02 UTC_
 _Ветка: test_
 _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_TEST.md_
 
@@ -24,6 +24,7 @@ _Raw: https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/FILELIST_T
 - [src/main/java/com/example/terradiver/kinetics/CrownBearingBlock.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/kinetics/CrownBearingBlock.java)
 - [src/main/java/com/example/terradiver/kinetics/CrownBearingBlockEntity.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/kinetics/CrownBearingBlockEntity.java)
 - [src/main/java/com/example/terradiver/kinetics/CrownBufferHandler.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/kinetics/CrownBufferHandler.java)
+- [src/main/java/com/example/terradiver/kinetics/RecentSpeed.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/kinetics/RecentSpeed.java)
 - [src/main/java/com/example/terradiver/mixin/ContainerOffhandMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/ContainerOffhandMixin.java)
 - [src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/LevelRendererMixin.java)
 - [src/main/java/com/example/terradiver/mixin/SlotMixin.java](https://raw.githubusercontent.com/Diyksfol/terra_diver_mdk/test/src/main/java/com/example/terradiver/mixin/SlotMixin.java)
