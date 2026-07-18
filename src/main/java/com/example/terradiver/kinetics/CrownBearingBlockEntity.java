@@ -1,6 +1,7 @@
 package com.example.terradiver.kinetics;
 
 import com.example.terradiver.physics.DrillCrownBlock;
+import com.example.terradiver.physics.PhysicsUtils;
 import com.example.terradiver.physics.DrillCrownPartBlock;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
 import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
@@ -10,6 +11,10 @@ import com.simibubi.create.foundation.utility.ServerSpeedProvider;
 import com.example.terradiver.config.ModConfig;
 import com.example.terradiver.registry.BlockRegistry;
 import dev.ryanhcode.offroad.handlers.server.MultiMiningSupplier;
+import dev.ryanhcode.offroad.handlers.server.MultiMiningServerManager;
+import dev.ryanhcode.sable.Sable;
+import net.minecraft.world.phys.Vec3;
+import java.util.Map;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
@@ -92,8 +97,27 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     // а блокстейт в конструкторе ещё не гарантирован.
     private CrownBufferHandler buffer;
 
-    // Множитель скорости грызни. Подобрать на плейтесте. - TUNE
-    private static final float BREAK_SPEED_DIVISOR = 40.0F;
+    // Делитель темпа грызни. ВНИМАНИЕ на масштаб: делим ПРОФИЛЬ (градусы поворота за тик), а не
+    // обороты вала — это числа разного порядка, при 64 об это 4.8 против 64. Подбирая, помни, что
+    // 12 здесь даёт примерно то же, что 160 давало бы от оборотов вала. - TUNE
+    private static final float BREAK_SPEED_DIVISOR = 12.0F;
+
+    // На сколько блоков вперёд от плоскости короны заглядываем. - TUNE
+    private static final double CROWN_REACH = 1.0;
+    // Запас радиуса сверх габарита короны, чтобы не тереться боками о стенки тоннеля. - TUNE
+    private static final double CROWN_RADIUS_MARGIN = 0.5;
+    // Ниже этой скорости грызть нечем — бур фактически стоит.
+    private static final float MIN_DIG_SPEED = 0.05F;
+
+    // Парковка. Корона симметрична на четверть оборота, поэтому вставать можно в любой из четырёх
+    // ориентаций, а не только в исходной: путь докрутки сокращается вчетверо.
+    private static final float PARK_STEP = 90.0F;
+    // Если до ближайшей парковки ближе этого — просто доснапить: на глаз такой доворот не виден.
+    // Это же чинит «запустил и сразу остановил»: бур не успел провернуться, снап незаметен.
+    private static final float PARK_SNAP = 15.0F;
+
+    // Куда паркуемся в этой разборке. Считает сервер в disassemble().
+    private float parkAngle = 0.0F;
 
     /*
      * Скорость вращения для родителя: он ею и крутит угол в tick(), и интерполирует рендер.
@@ -173,10 +197,11 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             }
         }
         advanceProfile();
+        updateMiningBlocks();
         if (braking) {
             brakeGuard--;
             if (brakeRemaining <= BRAKE_ARRIVE_EPS || brakeGuard <= 0) {
-                angle = 0.0F; // приехали ровно в исходный угол
+                angle = parkAngle; // приехали ровно в парковку
                 doDisassemble();
                 return true;
             }
@@ -238,15 +263,31 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         float v0 = Math.abs(easedAngularSpeed);
         int dir = easedAngularSpeed >= 0 ? 1 : -1;
         float a = ((angle % 360.0F) + 360.0F) % 360.0F;
-        float remaining = dir > 0 ? (360.0F - a) % 360.0F : a;
-        int n = Math.max(1, rampTicks());
-        float decelDist = v0 * n / 2.0F;
-        int turns = Math.max(0, (int) Math.ceil((decelDist - remaining) / 360.0F));
-        float dist = remaining + 360.0F * turns;
-        if (dist < 1.0F) {
-            doDisassemble(); // уже практически в исходном
+
+        // Уже практически в парковке — просто доснапить. Сюда попадает «запустил и сразу остановил»:
+        // бур провернуться не успел, докручивать ему почти целый оборот незачем.
+        float nearest = Math.round(a / PARK_STEP) * PARK_STEP;
+        if (Math.abs(a - nearest) <= PARK_SNAP) {
+            parkAngle = ((nearest % 360.0F) + 360.0F) % 360.0F;
+            angle = parkAngle;
+            doDisassemble();
             return;
         }
+        // Иначе докручиваемся до СЛЕДУЮЩЕЙ четверти по ходу вращения — не больше 90 градусов.
+        float next = dir > 0
+                ? (float) (Math.floor(a / PARK_STEP) + 1.0) * PARK_STEP
+                : (float) (Math.ceil(a / PARK_STEP) - 1.0) * PARK_STEP;
+        parkAngle = ((next % 360.0F) + 360.0F) % 360.0F;
+        float remaining = Math.abs(next - a);
+        int n = Math.max(1, rampTicks());
+        float decelDist = v0 * n / 2.0F;
+        // Добираем ЧЕТВЕРТЯМИ, а не целыми оборотами: любая четверть — валидная парковка, поэтому
+        // незачем накидывать полный оборот там, где торможению не хватило пары десятков градусов.
+        // Целыми оборотами здесь получалось хуже, чем до парковки на четверть: до 450 градусов.
+        int steps = Math.max(0, (int) Math.ceil((decelDist - remaining) / PARK_STEP));
+        float dist = remaining + PARK_STEP * steps;
+        parkAngle = ((parkAngle + dir * PARK_STEP * steps) % 360.0F + 360.0F) % 360.0F;
+
         braking = true;
         brakeV0 = v0;
         brakeCoast = Math.max(0, Math.round((dist - decelDist) / v0));
@@ -315,6 +356,10 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     }
 
     private void doDisassemble() {
+        // Парковка (parkAngle) НЕ обнуляется здесь: он уже выставлен в disassemble() на ближайшую
+        // кратную 90 четверть, и именно в ней контраптия должна собраться, чтобы коллизия блоков
+        // легла ровно (Create кладёт блоки по ориентации; некратный угол разъезжается — это чинили
+        // раньше). Обнуление стояло ДО setAngle и всегда парковало в ноль, съедая четверть.
         braking = false;
         brakeV0 = 0.0F;
         brakeCoast = 0;
@@ -326,10 +371,16 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         rampAge = 0;
         rampLen = 1;
         easedAngularSpeed = 0.0F;
+        // Мгновенно доводим угол до выбранной четверти ДО разборки: super.disassemble() соберёт
+        // контраптию из текущего угла. Округляем на всякий случай — угол обязан быть кратен 90.
+        float quarter = Math.round(parkAngle / PARK_STEP) * PARK_STEP;
+        quarter = ((quarter % 360.0F) + 360.0F) % 360.0F;
+        angle = quarter;
         if (movedContraption != null) {
-            movedContraption.setAngle(0.0F); // парковка в исходную ориентацию
+            movedContraption.setAngle(quarter);
         }
-        super.disassemble(); // внутри sendData() — клиент получит уже сброшенный профиль
+        parkAngle = 0.0F;
+        super.disassemble(); // ставит angle=0 у СЕБЯ и собирает контраптию из её текущей ориентации
     }
 
     // Убираем прокручиваемую настройку «Режим движения», унаследованную от подшипника Create:
@@ -355,6 +406,111 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     // и отрицательный ответ снимает наши заявки. Прогресс разрушения не идёт, блоки не ломаются,
     // на землю ничего не падает. Освободился буфер — грызня продолжается.
 
+    /*
+     * Какие блоки грызть в этом тике. Заявки живут 20 тиков, поэтому подаём их заново каждый тик —
+     * перестали подавать, и грызня сама затухает.
+     *
+     * Координаты — главный тонкий момент, из-за которого это долго не писалось. Корона едет в
+     * контраптии Create, и её собственные координаты — локальные. Если машина собрана как физический
+     * корабль, то даже после перевода в «мировые» это будут координаты ВНУТРИ корабля (Sable держит
+     * корабли на гигантских координатах того же мира), а порода лежит в настоящем мире совсем в
+     * другом месте. Грызть по ним — грызть пустоту.
+     * Перевод делает хелпер Sable: он выталкивает точку наружу из корабля в настоящий мир, а если
+     * машина обычная и никакого корабля нет — возвращает точку как есть. Поэтому одна и та же ветка
+     * работает и на статичной стойке, и на физичной штуковине. Ровно так же устроено бурильное
+     * колесо самих Offroad — оттуда и взято.
+     */
+    private void updateMiningBlocks() {
+        if (level == null || level.isClientSide || movedContraption == null || !isActive()) {
+            return;
+        }
+        BlockState self = getBlockState();
+        if (!(self.getBlock() instanceof CrownBearingBlock)) {
+            return;
+        }
+        Direction facing = self.getValue(CrownBearingBlock.FACING);
+        Vec3 step = new Vec3(facing.getStepX(), facing.getStepY(), facing.getStepZ());
+
+        // Грызём вокруг КАЖДОГО мастера короны, а не перед каждым резцом. Раньше заказывался ровно
+        // слой перед короной — из-за этого бур, целиком утопленный в камень, не выгрызал то, ВНУТРИ
+        // чего сам находится, и не расширял тоннель по бокам.
+        int masters = 0;
+        var blocks = movedContraption.getContraption().getBlocks();
+        for (Map.Entry<BlockPos, StructureBlockInfo> entry : blocks.entrySet()) {
+            if (!(entry.getValue().state().getBlock() instanceof DrillCrownBlock master)) {
+                continue; // цилиндр строим от мастера; ведомые ячейки в него и так попадут
+            }
+            int side = sideOf(master.crownSize());
+            if (side <= 0) {
+                continue;
+            }
+            masters++;
+            digCylinderAround(entry.getKey(), step, side);
+        }
+        // Диагностика (раз в секунду): видно, доходит ли до заказа и сколько всего блоков в контраптии.
+        // Если masters=0 при непустом blocks — проблема в том, ЧТО лежит в контраптии, а не в скане.
+        // TODO снять после отладки копания.
+        if (level.getGameTime() % 20L == 0L) {
+            org.slf4j.LoggerFactory.getLogger("terra_diver").info(
+                    "[drill] speed={} active={} blocksInContraption={} masters={}",
+                    String.format("%.2f", easedAngularSpeed), isActive(), blocks.size(), masters);
+        }
+    }
+
+    /*
+     * Зона грызни одной короны — цилиндр по её габариту: ось вдоль носа, радиус по размеру короны,
+     * длина от собственной плоскости короны до CROWN_REACH вперёд. Основания не выпячиваем — назад
+     * не грызём вовсе, вперёд ровно на заданный запас: тоннель получается по буру, а не воронкой.
+     *
+     * Ось считается ЧЕРЕЗ те же две проекции, что и центр, а не берётся из facing напрямую: у
+     * физической штуковины бур повёрнут как угодно, и «вперёд» в настоящем мире надо получать тем же
+     * переводом, что и позицию, иначе цилиндр ляжет вкось.
+     */
+    private void digCylinderAround(BlockPos masterLocal, Vec3 localStep, int side) {
+        Vec3 centerLocal = masterLocal.getCenter();
+        Vec3 center = toRealWorld(centerLocal);
+        Vec3 ahead = toRealWorld(centerLocal.add(localStep));
+        Vec3 axis = ahead.subtract(center);
+        if (axis.lengthSqr() < 1.0E-6) {
+            return; // перевод дал вырожденную ось — пропускаем тик, чем грызть вкось
+        }
+        axis = axis.normalize();
+
+        double radius = side / 2.0 + CROWN_RADIUS_MARGIN;
+        double back = -0.75;                 // собственная плоскость короны — то, в чём бур утоплен
+        double front = CROWN_REACH + 0.25;   // и запас вперёд
+        int box = (int) Math.ceil(radius + CROWN_REACH) + 1;
+
+        BlockPos origin = BlockPos.containing(center);
+        for (int dx = -box; dx <= box; dx++) {
+            for (int dy = -box; dy <= box; dy++) {
+                for (int dz = -box; dz <= box; dz++) {
+                    BlockPos target = origin.offset(dx, dy, dz);
+                    Vec3 d = target.getCenter().subtract(center);
+                    double along = d.dot(axis);
+                    if (along < back || along > front) {
+                        continue;
+                    }
+                    if (d.subtract(axis.scale(along)).lengthSqr() > radius * radius) {
+                        continue; // вне цилиндра
+                    }
+                    BlockState state = level.getBlockState(target);
+                    if (state.isAir() || !PhysicsUtils.is_diggable(state)) {
+                        continue; // воздух, жидкости и непробиваемое не заказываем
+                    }
+                    MultiMiningServerManager.addOrRefreshPos(level, target, this);
+                }
+            }
+        }
+    }
+
+    // Локальная точка контраптии -> настоящий мир. Второй шаг обязателен: если машина собрана в
+    // физический корабль, Sable держит его на гигантских координатах того же мира, и без выталкивания
+    // наружу мы бы грызли пустоту. Обычная стойка — точка возвращается как есть.
+    private Vec3 toRealWorld(Vec3 local) {
+        return Sable.HELPER.projectOutOfSubLevel(level, movedContraption.toGlobalVector(local, 1.0F));
+    }
+
     public CrownBufferHandler getBuffer() {
         if (buffer == null) {
             boolean sturdy = getBlockState().getBlock() == BlockRegistry.CROWN_BEARING_STURDY.get();
@@ -368,9 +524,13 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     // заморозка. Торможение тоже: докручиваясь в исходный угол, бур уже не грызёт.
     @Override
     public boolean isActive() {
-        return running
-                && !braking
-                && !isRemoved()
+        // Грызём, пока подшипник СОБРАН и на валу есть обороты. Намеренно НЕ завязываемся на порог
+        // скорости профиля: при физикализации профиль на миг сбрасывается и дёргается, и порог то и
+        // дело выдавал бы «неактивен», обрывая грызню. Плавность темпа (нарастание при раскрутке,
+        // затухание при торможении) обеспечивает getBreakingSpeed, который читает профиль напрямую.
+        // Полный буфер намеренно гасит активность — это заморозка грызни.
+        return !isRemoved()
+                && movedContraption != null
                 && getSpeed() != 0.0F
                 && getBuffer().hasSpace();
     }
@@ -382,13 +542,19 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     }
 
     // Темп грызни одного блока. Движок делит его на твёрдость и копит, пока не наберётся порог.
-    // Берём скорость вала, а не скорость профиля: профиль — это про то, как бур ВЫГЛЯДИТ.
+    // Считается от ПРОФИЛЯ: как бур выглядит, так он и грызёт. Раскрутка — грызня нарастает вместе
+    // с ней; торможение — затухает вместе с ним. - TUNE через BREAK_SPEED_DIVISOR
     @Override
     public float getBreakingSpeed(Level level, BlockPos pos, BlockState state) {
         if (!isActive()) {
             return 0.0F;
         }
-        return (float) Mth.clamp(Math.abs(getSpeed()) / BREAK_SPEED_DIVISOR, 0.01, 16.0);
+        // Темп по ПРОФИЛЮ: раскрутка наращивает грызню, торможение затухает. Но пока профиль догоняет
+        // обороты (в т.ч. сразу после перезапуска при физикализации), берём хотя бы малый пол, иначе
+        // грызня замирает при собранном буре с живым валом. - TUNE через BREAK_SPEED_DIVISOR
+        float fromProfile = Math.abs(easedAngularSpeed) / BREAK_SPEED_DIVISOR;
+        float floor = 0.05F; // ~медленно, но грызёт
+        return (float) Mth.clamp(Math.max(fromProfile, floor), 0.001, 16.0);
     }
 
     // Дроп сломанного блока. Что не влезло — движок предложит другим заказчикам, а потом уронит
