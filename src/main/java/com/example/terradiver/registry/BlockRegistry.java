@@ -29,63 +29,63 @@ public class BlockRegistry {
 
     // ==================== DRILL CROWNS 1x1 (мастер мультиблока) ====================
     public static final DeferredHolder<Block, Block> DRILL_CROWN_1x1_COPPER =
-            BLOCKS.register("drill_crown_1x1_copper", () -> (Block) new DrillCrownBlock(masterProps(), "1x1"));
+            BLOCKS.register("drill_crown_1x1_copper", () -> (Block) new DrillCrownBlock(masterProps(), "1x1", com.example.terradiver.physics.CrownMaterial.COPPER));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_1x1_IRON =
-            BLOCKS.register("drill_crown_1x1_iron", () -> (Block) new DrillCrownBlock(masterProps(), "1x1"));
+            BLOCKS.register("drill_crown_1x1_iron", () -> (Block) new DrillCrownBlock(masterProps(), "1x1", com.example.terradiver.physics.CrownMaterial.IRON));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_1x1_BRASS =
-            BLOCKS.register("drill_crown_1x1_brass", () -> (Block) new DrillCrownBlock(masterProps(), "1x1"));
+            BLOCKS.register("drill_crown_1x1_brass", () -> (Block) new DrillCrownBlock(masterProps(), "1x1", com.example.terradiver.physics.CrownMaterial.BRASS));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_1x1_NETHERITE =
-            BLOCKS.register("drill_crown_1x1_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "1x1"));
+            BLOCKS.register("drill_crown_1x1_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "1x1", com.example.terradiver.physics.CrownMaterial.NETHERITE));
 
     // ==================== DRILL CROWNS 3x3 (мастер мультиблока) ====================
     public static final DeferredHolder<Block, Block> DRILL_CROWN_3x3_COPPER =
-            BLOCKS.register("drill_crown_3x3_copper", () -> (Block) new DrillCrownBlock(masterProps(), "3x3"));
+            BLOCKS.register("drill_crown_3x3_copper", () -> (Block) new DrillCrownBlock(masterProps(), "3x3", com.example.terradiver.physics.CrownMaterial.COPPER));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_3x3_IRON =
-            BLOCKS.register("drill_crown_3x3_iron", () -> (Block) new DrillCrownBlock(masterProps(), "3x3"));
+            BLOCKS.register("drill_crown_3x3_iron", () -> (Block) new DrillCrownBlock(masterProps(), "3x3", com.example.terradiver.physics.CrownMaterial.IRON));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_3x3_BRASS =
-            BLOCKS.register("drill_crown_3x3_brass", () -> (Block) new DrillCrownBlock(masterProps(), "3x3"));
+            BLOCKS.register("drill_crown_3x3_brass", () -> (Block) new DrillCrownBlock(masterProps(), "3x3", com.example.terradiver.physics.CrownMaterial.BRASS));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_3x3_NETHERITE =
-            BLOCKS.register("drill_crown_3x3_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "3x3"));
+            BLOCKS.register("drill_crown_3x3_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "3x3", com.example.terradiver.physics.CrownMaterial.NETHERITE));
 
     // ==================== DRILL CROWNS 5x5 (мастер мультиблока) ====================
     public static final DeferredHolder<Block, Block> DRILL_CROWN_5x5_COPPER =
-            BLOCKS.register("drill_crown_5x5_copper", () -> (Block) new DrillCrownBlock(masterProps(), "5x5"));
+            BLOCKS.register("drill_crown_5x5_copper", () -> (Block) new DrillCrownBlock(masterProps(), "5x5", com.example.terradiver.physics.CrownMaterial.COPPER));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_5x5_IRON =
-            BLOCKS.register("drill_crown_5x5_iron", () -> (Block) new DrillCrownBlock(masterProps(), "5x5"));
+            BLOCKS.register("drill_crown_5x5_iron", () -> (Block) new DrillCrownBlock(masterProps(), "5x5", com.example.terradiver.physics.CrownMaterial.IRON));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_5x5_BRASS =
-            BLOCKS.register("drill_crown_5x5_brass", () -> (Block) new DrillCrownBlock(masterProps(), "5x5"));
+            BLOCKS.register("drill_crown_5x5_brass", () -> (Block) new DrillCrownBlock(masterProps(), "5x5", com.example.terradiver.physics.CrownMaterial.BRASS));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_5x5_NETHERITE =
-            BLOCKS.register("drill_crown_5x5_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "5x5"));
+            BLOCKS.register("drill_crown_5x5_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "5x5", com.example.terradiver.physics.CrownMaterial.NETHERITE));
 
     // ==================== DRILL CROWNS 7x7 (мастер мультиблока) ====================
     public static final DeferredHolder<Block, Block> DRILL_CROWN_7x7_COPPER =
-            BLOCKS.register("drill_crown_7x7_copper", () -> (Block) new DrillCrownBlock(masterProps(), "7x7"));
+            BLOCKS.register("drill_crown_7x7_copper", () -> (Block) new DrillCrownBlock(masterProps(), "7x7", com.example.terradiver.physics.CrownMaterial.COPPER));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_7x7_IRON =
-            BLOCKS.register("drill_crown_7x7_iron", () -> (Block) new DrillCrownBlock(masterProps(), "7x7"));
+            BLOCKS.register("drill_crown_7x7_iron", () -> (Block) new DrillCrownBlock(masterProps(), "7x7", com.example.terradiver.physics.CrownMaterial.IRON));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_7x7_BRASS =
-            BLOCKS.register("drill_crown_7x7_brass", () -> (Block) new DrillCrownBlock(masterProps(), "7x7"));
+            BLOCKS.register("drill_crown_7x7_brass", () -> (Block) new DrillCrownBlock(masterProps(), "7x7", com.example.terradiver.physics.CrownMaterial.BRASS));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_7x7_NETHERITE =
-            BLOCKS.register("drill_crown_7x7_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "7x7"));
+            BLOCKS.register("drill_crown_7x7_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "7x7", com.example.terradiver.physics.CrownMaterial.NETHERITE));
 
     // ==================== DRILL CROWNS 9x9 (мастер мультиблока) ====================
     public static final DeferredHolder<Block, Block> DRILL_CROWN_9x9_COPPER =
-            BLOCKS.register("drill_crown_9x9_copper", () -> (Block) new DrillCrownBlock(masterProps(), "9x9"));
+            BLOCKS.register("drill_crown_9x9_copper", () -> (Block) new DrillCrownBlock(masterProps(), "9x9", com.example.terradiver.physics.CrownMaterial.COPPER));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_9x9_IRON =
-            BLOCKS.register("drill_crown_9x9_iron", () -> (Block) new DrillCrownBlock(masterProps(), "9x9"));
+            BLOCKS.register("drill_crown_9x9_iron", () -> (Block) new DrillCrownBlock(masterProps(), "9x9", com.example.terradiver.physics.CrownMaterial.IRON));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_9x9_BRASS =
-            BLOCKS.register("drill_crown_9x9_brass", () -> (Block) new DrillCrownBlock(masterProps(), "9x9"));
+            BLOCKS.register("drill_crown_9x9_brass", () -> (Block) new DrillCrownBlock(masterProps(), "9x9", com.example.terradiver.physics.CrownMaterial.BRASS));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_9x9_NETHERITE =
-            BLOCKS.register("drill_crown_9x9_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "9x9"));
+            BLOCKS.register("drill_crown_9x9_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "9x9", com.example.terradiver.physics.CrownMaterial.NETHERITE));
 
     // ==================== DRILL CROWNS 11x11 (мастер мультиблока) ====================
     public static final DeferredHolder<Block, Block> DRILL_CROWN_11x11_COPPER =
-            BLOCKS.register("drill_crown_11x11_copper", () -> (Block) new DrillCrownBlock(masterProps(), "11x11"));
+            BLOCKS.register("drill_crown_11x11_copper", () -> (Block) new DrillCrownBlock(masterProps(), "11x11", com.example.terradiver.physics.CrownMaterial.COPPER));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_11x11_IRON =
-            BLOCKS.register("drill_crown_11x11_iron", () -> (Block) new DrillCrownBlock(masterProps(), "11x11"));
+            BLOCKS.register("drill_crown_11x11_iron", () -> (Block) new DrillCrownBlock(masterProps(), "11x11", com.example.terradiver.physics.CrownMaterial.IRON));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_11x11_BRASS =
-            BLOCKS.register("drill_crown_11x11_brass", () -> (Block) new DrillCrownBlock(masterProps(), "11x11"));
+            BLOCKS.register("drill_crown_11x11_brass", () -> (Block) new DrillCrownBlock(masterProps(), "11x11", com.example.terradiver.physics.CrownMaterial.BRASS));
     public static final DeferredHolder<Block, Block> DRILL_CROWN_11x11_NETHERITE =
-            BLOCKS.register("drill_crown_11x11_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "11x11"));
+            BLOCKS.register("drill_crown_11x11_netherite", () -> (Block) new DrillCrownBlock(masterProps(), "11x11", com.example.terradiver.physics.CrownMaterial.NETHERITE));
 
     // ==================== MULTIBLOCK PART (внутренний, невидимый) ====================
     public static final DeferredHolder<Block, DrillCrownPartBlock> DRILL_CROWN_PART =

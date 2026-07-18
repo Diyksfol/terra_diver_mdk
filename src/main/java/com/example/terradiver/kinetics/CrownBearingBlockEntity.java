@@ -100,7 +100,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     // Делитель темпа грызни. ВНИМАНИЕ на масштаб: делим ПРОФИЛЬ (градусы поворота за тик), а не
     // обороты вала — это числа разного порядка, при 64 об это 4.8 против 64. Подбирая, помни, что
     // 12 здесь даёт примерно то же, что 160 давало бы от оборотов вала. - TUNE
-    private static final float BREAK_SPEED_DIVISOR = 12.0F;
+    private static final float BREAK_SPEED_DIVISOR = 12.0F; // темп грызни; выше = медленнее
 
     // На сколько блоков вперёд от плоскости короны заглядываем. - TUNE
     private static final double CROWN_REACH = 1.0;
@@ -130,7 +130,13 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         float speed = easedAngularSpeed;
         if (level != null && level.isClientSide) {
             speed *= ServerSpeedProvider.get();
-            speed += clientAngleDiff / 3.0F;
+            // clientAngleDiff НЕ добавляем намеренно. У обычного подшипника Create он добирает
+            // клиентский угол к серверному, потому что клиент скорость сам не знает. У нас клиент
+            // ЗНАЕТ профиль (те же синхронизированные параметры кривой) и считает угол сам, поэтому
+            // расхождение мало. А вот сама добавка приходит скачками при каждом серверном пакете
+            // (раз в 3 тика) и делится пополам между ними — это и давало рывки «то быстрее, то
+            // медленнее» на статичной машине. На физичной её эффекта не было (угол берёт Sable),
+            // поэтому там рывков и не наблюдалось.
         }
         return speed;
     }
@@ -264,10 +270,12 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         int dir = easedAngularSpeed >= 0 ? 1 : -1;
         float a = ((angle % 360.0F) + 360.0F) % 360.0F;
 
-        // Уже практически в парковке — просто доснапить. Сюда попадает «запустил и сразу остановил»:
-        // бур провернуться не успел, докручивать ему почти целый оборот незачем.
-        float nearest = Math.round(a / PARK_STEP) * PARK_STEP;
-        if (Math.abs(a - nearest) <= PARK_SNAP) {
+        // Мгновенный снап — ТОЛЬКО когда бур ещё почти не крутится (запустил и сразу остановил): тогда
+        // тормозить нечего, доводим до ближайшей четверти сразу. Раньше условие было по БЛИЗОСТИ угла
+        // к четверти — и ловило нормально раскрученный бур, если тот в момент ПКМ случайно оказался у
+        // 90/180/270, давая «мгновенную остановку». Теперь смотрим на скорость, а не на угол.
+        if (v0 <= MIN_BRAKE_SPEED) {
+            float nearest = Math.round(a / PARK_STEP) * PARK_STEP;
             parkAngle = ((nearest % 360.0F) + 360.0F) % 360.0F;
             angle = parkAngle;
             doDisassemble();
@@ -310,19 +318,23 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     public void write(net.minecraft.nbt.CompoundTag tag, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
         super.write(tag, registries, clientPacket);
         tag.put("CrownBuffer", getBuffer().serializeNBT(registries));
-        if (clientPacket) {
-            tag.putFloat("CrownRampStart", rampStart);
-            tag.putFloat("CrownRampTarget", rampTarget);
-            tag.putInt("CrownRampLen", rampLen);
-            tag.putInt("CrownRampAge", rampAge);
-            tag.putBoolean("CrownBraking", braking);
-            tag.putFloat("CrownBrakeV0", brakeV0);
-            tag.putInt("CrownBrakeCoast", brakeCoast);
-            tag.putInt("CrownBrakeLen", brakeLen);
-            tag.putInt("CrownBrakeAge", brakeAge);
-            tag.putFloat("CrownBrakeLeft", brakeRemaining);
-            tag.putInt("CrownBrakeDir", brakeDir);
-        }
+        // Профиль пишем ВСЕГДА, не только в клиентский пакет. Когда машину физикализируют, Sable
+        // переносит блок в сублевел, и блок-сущность там ПЕРЕСОЗДАЁТСЯ — она читает серверный NBT.
+        // Раньше профиль лежал только в клиентском пакете, поэтому на новом месте easedAngularSpeed
+        // стартовал с нуля: бур перезапускался и заново разгонялся. Теперь состояние переезжает.
+        tag.putFloat("CrownEased", easedAngularSpeed);
+        tag.putFloat("CrownRampStart", rampStart);
+        tag.putFloat("CrownRampTarget", rampTarget);
+        tag.putInt("CrownRampLen", rampLen);
+        tag.putInt("CrownRampAge", rampAge);
+        tag.putBoolean("CrownBraking", braking);
+        tag.putFloat("CrownBrakeV0", brakeV0);
+        tag.putInt("CrownBrakeCoast", brakeCoast);
+        tag.putInt("CrownBrakeLen", brakeLen);
+        tag.putInt("CrownBrakeAge", brakeAge);
+        tag.putFloat("CrownBrakeLeft", brakeRemaining);
+        tag.putInt("CrownBrakeDir", brakeDir);
+        tag.putFloat("CrownParkAngle", parkAngle);
     }
 
     @Override
@@ -331,7 +343,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         if (tag.contains("CrownBuffer")) {
             getBuffer().deserializeNBT(registries, tag.getCompound("CrownBuffer"));
         }
-        if (clientPacket) {
+        if (tag.contains("CrownRampTarget")) {
             rampStart = tag.getFloat("CrownRampStart");
             rampTarget = tag.getFloat("CrownRampTarget");
             rampLen = Math.max(1, tag.getInt("CrownRampLen"));
@@ -343,14 +355,21 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             brakeAge = tag.getInt("CrownBrakeAge");
             brakeRemaining = tag.getFloat("CrownBrakeLeft");
             brakeDir = tag.getInt("CrownBrakeDir");
-            // Пересчитать скорость сразу по свежим параметрам: иначе один тик рисовался бы по старым.
-            if (braking) {
-                float mag = brakeAge <= brakeCoast
-                        ? brakeV0
-                        : brakeV0 * (1.0F - smoothstep((brakeAge - brakeCoast) / (float) brakeLen));
-                easedAngularSpeed = brakeDir * Math.min(mag, Math.max(0.0F, brakeRemaining));
-            } else {
-                easedAngularSpeed = rampStart + (rampTarget - rampStart) * smoothstep(rampAge / (float) rampLen);
+            parkAngle = tag.getFloat("CrownParkAngle");
+            // На сервере берём сохранённую скорость напрямую — не пересчитываем, чтобы переезд был
+            // бесшовным. На клиенте пересчёт по кривой (как раньше): один тик иначе рисовался бы по
+            // устаревшему значению.
+            if (clientPacket) {
+                if (braking) {
+                    float mag = brakeAge <= brakeCoast
+                            ? brakeV0
+                            : brakeV0 * (1.0F - smoothstep((brakeAge - brakeCoast) / (float) brakeLen));
+                    easedAngularSpeed = brakeDir * Math.min(mag, Math.max(0.0F, brakeRemaining));
+                } else {
+                    easedAngularSpeed = rampStart + (rampTarget - rampStart) * smoothstep(rampAge / (float) rampLen);
+                }
+            } else if (tag.contains("CrownEased")) {
+                easedAngularSpeed = tag.getFloat("CrownEased");
             }
         }
     }
@@ -447,14 +466,6 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             masters++;
             digCylinderAround(entry.getKey(), step, side);
         }
-        // Диагностика (раз в секунду): видно, доходит ли до заказа и сколько всего блоков в контраптии.
-        // Если masters=0 при непустом blocks — проблема в том, ЧТО лежит в контраптии, а не в скане.
-        // TODO снять после отладки копания.
-        if (level.getGameTime() % 20L == 0L) {
-            org.slf4j.LoggerFactory.getLogger("terra_diver").info(
-                    "[drill] speed={} active={} blocksInContraption={} masters={}",
-                    String.format("%.2f", easedAngularSpeed), isActive(), blocks.size(), masters);
-        }
     }
 
     /*
@@ -477,8 +488,11 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         axis = axis.normalize();
 
         double radius = side / 2.0 + CROWN_RADIUS_MARGIN;
-        double back = -0.75;                 // собственная плоскость короны — то, в чём бур утоплен
-        double front = CROWN_REACH + 0.25;   // и запас вперёд
+        // Окно вдоль оси вынесено ВПЕРЁД от плоскости короны, а не симметрично вокруг неё. Раньше
+        // back=-0.75 давал зону, наполовину лежащую В САМОМ буре — отсюда «копает только у основания».
+        // Теперь назад заходим лишь на пол-блока (плоскость резцов), а вперёд — на всю глубину REACH.
+        double back = -0.5;
+        double front = CROWN_REACH + 0.5;
         int box = (int) Math.ceil(radius + CROWN_REACH) + 1;
 
         BlockPos origin = BlockPos.containing(center);
@@ -552,9 +566,30 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         // Темп по ПРОФИЛЮ: раскрутка наращивает грызню, торможение затухает. Но пока профиль догоняет
         // обороты (в т.ч. сразу после перезапуска при физикализации), берём хотя бы малый пол, иначе
         // грызня замирает при собранном буре с живым валом. - TUNE через BREAK_SPEED_DIVISOR
-        float fromProfile = Math.abs(easedAngularSpeed) / BREAK_SPEED_DIVISOR;
-        float floor = 0.05F; // ~медленно, но грызёт
-        return (float) Mth.clamp(Math.max(fromProfile, floor), 0.001, 16.0);
+        float fromProfile = Math.abs(easedAngularSpeed) / (BREAK_SPEED_DIVISOR * 3.0F); // *3 = ещё втрое медленнее (п.4)
+        float floor = 0.017F; // ~медленно, но грызёт (втрое ниже прежнего, п.4)
+        // Множитель материала: медь базовая, дальше быстрее (значения в конфиге). Средний по всем
+        // коронам этого бура — на одном подшипнике можно смешать материалы, тогда темп усредняется.
+        float speed = Math.max(fromProfile, floor) * materialFactor();
+        return (float) Mth.clamp(speed, 0.001, 16.0);
+    }
+
+    // Средний множитель материала по всем коронам в контраптии. Если корон нет (не должно случаться
+    // при активном буре) — 1.0. Считается на лету: коронов немного, а балансовые прав­ки конфига
+    // подхватываются сразу.
+    private float materialFactor() {
+        if (movedContraption == null || movedContraption.getContraption() == null) {
+            return 1.0F;
+        }
+        double sum = 0.0;
+        int count = 0;
+        for (StructureBlockInfo info : movedContraption.getContraption().getBlocks().values()) {
+            if (info.state().getBlock() instanceof DrillCrownBlock crown) {
+                sum += crown.crownMaterial().factor();
+                count++;
+            }
+        }
+        return count == 0 ? 1.0F : (float) (sum / count);
     }
 
     // Дроп сломанного блока. Что не влезло — движок предложит другим заказчикам, а потом уронит

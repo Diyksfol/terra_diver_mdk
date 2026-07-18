@@ -36,11 +36,19 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     private static final double[][] FULL_CUBE = {{0.0, 0.0, 0.0, 1.0, 1.0, 1.0}};
 
     private final String size;
+    private final CrownMaterial material;
     private final Map<Direction, VoxelShape> shapes;
 
+    // Совместимость: старый вызов без материала → медь (базовый tier). Все существующие вызовы
+    // остаются валидными, реестр постепенно переведём на явный материал.
     public DrillCrownBlock(Properties properties, String size) {
+        this(properties, size, CrownMaterial.COPPER);
+    }
+
+    public DrillCrownBlock(Properties properties, String size, CrownMaterial material) {
         super(properties);
         this.size = size;
+        this.material = material;
         double[][] base = "1x1".equals(size) ? TIP_BASE : FULL_CUBE; // NxN мастер-ячейка — полный куб
         EnumMap<Direction, VoxelShape> m = new EnumMap<>(Direction.class);
         for (Direction d : Direction.values()) {
@@ -48,6 +56,11 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         }
         this.shapes = m;
         registerDefaultState(getStateDefinition().any().setValue(FACING, Direction.UP));
+    }
+
+    // Материал короны — для множителя темпа грызни (см. CrownMaterial.factor и подшипник).
+    public CrownMaterial crownMaterial() {
+        return material;
     }
 
     @Override
@@ -90,6 +103,9 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
         // Сломали мастера в выживании → выронить один предмет короны (структура снесётся в onRemove).
         if (!level.isClientSide && !player.getAbilities().instabuild) {
             DrillCrownMultiblock.dropCrownItem(level, pos);
+            // Пометить, что предмет уже выпал: страховочный дроп в onRemove для этого пути НЕ должен
+            // сработать, иначе на одно ломание — два предмета. Флаг снимается в самом onRemove.
+            DrillCrownMultiblock.markDroppedByPlayer();
         }
         // Сбросить прогресс ломания по ВСЕМ ячейкам короны, иначе при повторной установке на то же
         // место блок появляется «с трещинами» (клиент держит старый прогресс до первого ЛКМ).
@@ -185,10 +201,20 @@ public class DrillCrownBlock extends Block implements DrillCrownMultiblock.Maste
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
         // Сломали мастера → снести всю структуру (флаг DISSOLVING гасит рекурсию). При moved=true
-        // мастера забирает контраптия Create (она захватывает и ведомые целиком) — сносить их НЕ надо.
+        // мастера ЗАБИРАЕТ контраптия Create (она захватывает и ведомые целиком) — сносить их НЕ надо.
         if (!moved && !state.is(newState.getBlock()) && !DrillCrownMultiblock.isDissolving()) {
             // Размер и направление берём из СВОЕГО старого состояния — мастер в мире уже заменён.
             DrillCrownMultiblock.dissolve(level, pos, crownSize(), state.getValue(FACING), state);
+            // Страховка от исчезновения: ловим пути сноса, которые НЕ роняют предмет сами (взрыв,
+            // поршень, замена блока извне, аварийная разборка контраптии сквозь движущиеся сущности).
+            // НЕ дублируем: пропускаем, если предмет уже выпал через ломание игроком, если игрок в
+            // креативе (там дропа быть не должно) или если на месте появилась ДРУГАЯ корона (пересборка).
+            if (!level.isClientSide
+                    && !DrillCrownMultiblock.wasDroppedByPlayer()
+                    && !(newState.getBlock() instanceof DrillCrownMultiblock.Master)) {
+                DrillCrownMultiblock.dropCrownItem(level, pos, state);
+            }
+            DrillCrownMultiblock.clearDroppedByPlayer(); // снять флаг: следующий снос — с чистого листа
         }
         super.onRemove(state, level, pos, newState, moved);
     }

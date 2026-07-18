@@ -23,6 +23,10 @@ public final class DrillCrownMultiblock {
 
     private static final ThreadLocal<Boolean> DISSOLVING = ThreadLocal.withInitial(() -> Boolean.FALSE);
 
+    // Помечает, что предмет короны уже выронен в playerWillDestroy (штатное ломание игроком). Тогда
+    // страховочный дроп в onRemove НЕ срабатывает — иначе на одно ломание падало бы два предмета (дюп).
+    private static final ThreadLocal<Boolean> DROPPED_BY_PLAYER = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
     // Частиц разрушения на ячейку у МУЛЬТИ-буров. Мало — чтобы большие короны (до 190 ячеек) не
     // выбрасывали сотни частиц разом. Бур 1x1 сюда не попадает — у него обычные ванильные частицы.
     private static final int PARTICLES_PER_CELL = 3;
@@ -35,6 +39,19 @@ public final class DrillCrownMultiblock {
 
     public static boolean isDissolving() {
         return DISSOLVING.get();
+    }
+
+    // Пометить/снять/проверить, что игрок уже уронил предмет при штатном ломании (защита от дюпа).
+    public static void markDroppedByPlayer() {
+        DROPPED_BY_PLAYER.set(Boolean.TRUE);
+    }
+
+    public static void clearDroppedByPlayer() {
+        DROPPED_BY_PLAYER.set(Boolean.FALSE);
+    }
+
+    public static boolean wasDroppedByPlayer() {
+        return DROPPED_BY_PLAYER.get();
     }
 
     /*
@@ -107,6 +124,18 @@ public final class DrillCrownMultiblock {
         BlockState ms = level.getBlockState(masterPos);
         if (ms.getBlock() instanceof Master) {
             Block.popResource(level, masterPos, new ItemStack(ms.getBlock()));
+        }
+    }
+
+    /*
+     * То же, но состояние передаётся явно. Нужно для АВАРИЙНОЙ поломки: там мастер в мире уже заменён
+     * (воздухом или другим блоком), и чтение из мира вернуло бы не корону — предмет бы не выпал, и
+     * корона исчезла бы бесследно. Здесь берём переданное старое состояние, поэтому предмет выпадает
+     * даже когда блока в мире уже нет.
+     */
+    public static void dropCrownItem(Level level, BlockPos masterPos, BlockState oldState) {
+        if (oldState != null && oldState.getBlock() instanceof Master) {
+            Block.popResource(level, masterPos, new ItemStack(oldState.getBlock()));
         }
     }
 
