@@ -489,91 +489,62 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         if (!(self.getBlock() instanceof CrownBearingBlock)) {
             return;
         }
+        // Направление бурения В МИРЕ получаем переводом двух точек контраптии, а не из facing
+        // подшипника: на физичной штуковине бур повёрнут как угодно. Локальный шаг = facing.
         Direction facing = self.getValue(CrownBearingBlock.FACING);
-        Vec3 step = new Vec3(facing.getStepX(), facing.getStepY(), facing.getStepZ());
+        Vec3 stepLocal = new Vec3(facing.getStepX(), facing.getStepY(), facing.getStepZ());
 
-        // Грызём вокруг КАЖДОГО мастера короны, а не перед каждым резцом. Раньше заказывался ровно
-        // слой перед короной — из-за этого бур, целиком утопленный в камень, не выгрызал то, ВНУТРИ
-        // чего сам находится, и не расширял тоннель по бокам.
-        int masters = 0;
+        // Собираем локальные позиции всех ячеек короны — чтобы отличить КРАЙ короны от середины.
+        // Тоннель надо грызть чуть ШИРЕ бура, иначе он пробуривает дырку по своему сечению и упирается
+        // краями в стенки (не пролезает). Но расширять по всей площади — лишние заказы; расширяем
+        // только по периметру: у крайних ячеек добавляем колонку вбок наружу.
         var blocks = movedContraption.getContraption().getBlocks();
+        java.util.Set<BlockPos> crownCells = new java.util.HashSet<>();
         for (Map.Entry<BlockPos, StructureBlockInfo> entry : blocks.entrySet()) {
-            if (!(entry.getValue().state().getBlock() instanceof DrillCrownBlock master)) {
-                continue; // цилиндр строим от мастера; ведомые ячейки в него и так попадут
+            if (isCrown(entry.getValue().state())) {
+                crownCells.add(entry.getKey());
             }
-            int side = sideOf(master.crownSize());
-            if (side <= 0) {
+        }
+
+        int reachCells = (int) Math.ceil(CROWN_REACH + 0.5); // на сколько клеток вперёд грызём
+        for (BlockPos cellLocal : crownCells) {
+            Vec3 cellCenter = toRealWorld(cellLocal.getCenter());
+            Vec3 aheadCenter = toRealWorld(cellLocal.getCenter().add(stepLocal));
+            Vec3 axis = aheadCenter.subtract(cellCenter);
+            if (axis.lengthSqr() < 1.0E-6) {
                 continue;
             }
-            masters++;
-            digCylinderAround(entry.getKey(), step, side);
+            axis = axis.normalize();
+            // Колонка прямо перед резцом.
+            digColumn(cellCenter, axis, reachCells);
+            // Для КРАЙНИХ ячеек — ещё колонка на клетку наружу вбок, чтобы тоннель был шире бура и он
+            // пролезал. Крайняя = у которой нет соседней ячейки короны в этом боковом направлении.
+            // Боковые направления берём из контраптии (перпендикуляры оси бурения), их 4.
+            for (Direction side : Direction.values()) {
+                if (side == facing || side == facing.getOpposite()) {
+                    continue; // вдоль оси не расширяем — это вперёд/назад, а не вбок
+                }
+                BlockPos neighbor = cellLocal.relative(side);
+                if (crownCells.contains(neighbor)) {
+                    continue; // сосед по короне есть — эта ячейка не край в эту сторону
+                }
+                // Наружная клетка вбок от края + колонка вперёд от неё: расширяем стенку тоннеля.
+                Vec3 outLocal = new Vec3(side.getStepX(), side.getStepY(), side.getStepZ());
+                Vec3 outCenter = toRealWorld(cellLocal.getCenter().add(outLocal));
+                digColumn(outCenter, axis, reachCells);
+            }
         }
     }
 
-    /*
-     * Зона грызни одной короны — цилиндр по её габариту: ось вдоль носа, радиус по размеру короны,
-     * длина от собственной плоскости короны до CROWN_REACH вперёд. Основания не выпячиваем — назад
-     * не грызём вовсе, вперёд ровно на заданный запас: тоннель получается по буру, а не воронкой.
-     *
-     * Ось считается ЧЕРЕЗ те же две проекции, что и центр, а не берётся из facing напрямую: у
-     * физической штуковины бур повёрнут как угодно, и «вперёд» в настоящем мире надо получать тем же
-     * переводом, что и позицию, иначе цилиндр ляжет вкось.
-     */
-    private void digCylinderAround(BlockPos masterLocal, Vec3 localStep, int side) {
-        Vec3 centerLocal = masterLocal.getCenter();
-        Vec3 center = toRealWorld(centerLocal);
-        Vec3 ahead = toRealWorld(centerLocal.add(localStep));
-        Vec3 axis = ahead.subtract(center);
-        if (axis.lengthSqr() < 1.0E-6) {
-            return; // перевод дал вырожденную ось — пропускаем тик, чем грызть вкось
-        }
-        axis = axis.normalize();
-
-        double radius = side / 2.0 + CROWN_RADIUS_MARGIN;
-        // Окно вдоль оси вынесено ЦЕЛИКОМ ВПЕРЁД от короны. Мастер физически сидит в контраптии, а
-        // грызть надо породу ПЕРЕД ним, не его собственную клетку. Раньше окно [-0.5, REACH+0.5]
-        // почти всё лежало в самом буре — отсюда «спереди не копает, копает внутри себя». Теперь от
-        // передней грани короны (полблока от центра) и на глубину REACH вперёд, с запасом полблока.
-        double front0 = 0.5;                     // передняя грань клетки короны
-        double front1 = 0.5 + CROWN_REACH + 0.5; // и вперёд на всю глубину + запас
-        int box = (int) Math.ceil(radius + front1) + 1;
-
-        // Куб смещений центрируем на СЕРЕДИНУ зоны грызни (перед короной), а не на мастера: иначе
-        // половина перебора уходит назад и вбок мимо цели, а вперёд достаёт лишь один слой.
-        Vec3 zoneCenter = center.add(axis.scale((front0 + front1) * 0.5));
-        BlockPos origin = BlockPos.containing(zoneCenter);
-        int ordered = 0;
-        for (int dx = -box; dx <= box; dx++) {
-            for (int dy = -box; dy <= box; dy++) {
-                for (int dz = -box; dz <= box; dz++) {
-                    BlockPos target = origin.offset(dx, dy, dz);
-                    Vec3 d = target.getCenter().subtract(center);
-                    double along = d.dot(axis);
-                    if (along < front0 || along > front1) {
-                        continue;
-                    }
-                    if (d.subtract(axis.scale(along)).lengthSqr() > radius * radius) {
-                        continue; // вне цилиндра
-                    }
-                    BlockState state = level.getBlockState(target);
-                    if (state.isAir() || !PhysicsUtils.is_diggable(state)) {
-                        continue; // воздух, жидкости и непробиваемое не заказываем
-                    }
-                    MultiMiningServerManager.addOrRefreshPos(level, target, this);
-                    ordered++;
-                }
+    // Заказать колонку клеток от точки start вдоль оси на reach клеток вперёд (пропуская непородные).
+    private void digColumn(Vec3 start, Vec3 axis, int reach) {
+        for (int step = 1; step <= reach; step++) {
+            BlockPos target = BlockPos.containing(start.add(axis.scale(step)));
+            BlockState state = level.getBlockState(target);
+            if (state.isAir() || !PhysicsUtils.is_diggable(state)) {
+                continue;
             }
-        }
-        // Диагностика зоны бурения (раз в секунду): реальные координаты центра короны, направление
-        // оси и сколько блоков заказано. Если ordered=0 при породе перед буром — ось/центр мимо.
-        // TODO снять после отладки бурения.
-        if (level.getGameTime() % 20L == 0L) {
-            org.slf4j.LoggerFactory.getLogger("terra_diver").info(
-                    "[dig] side={} center=({},{},{}) axis=({},{},{}) zone=({},{},{}) заказано={}",
-                    side,
-                    String.format("%.1f", center.x), String.format("%.1f", center.y), String.format("%.1f", center.z),
-                    String.format("%.2f", axis.x), String.format("%.2f", axis.y), String.format("%.2f", axis.z),
-                    origin.getX(), origin.getY(), origin.getZ(), ordered);
+            MultiMiningServerManager.addOrRefreshPos(level, target, this);
         }
     }
 
@@ -583,6 +554,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     private Vec3 toRealWorld(Vec3 local) {
         return Sable.HELPER.projectOutOfSubLevel(level, movedContraption.toGlobalVector(local, 1.0F));
     }
+
 
     public CrownBufferHandler getBuffer() {
         if (buffer == null) {
