@@ -494,10 +494,7 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         Direction facing = self.getValue(CrownBearingBlock.FACING);
         Vec3 stepLocal = new Vec3(facing.getStepX(), facing.getStepY(), facing.getStepZ());
 
-        // Собираем локальные позиции всех ячеек короны — чтобы отличить КРАЙ короны от середины.
-        // Тоннель надо грызть чуть ШИРЕ бура, иначе он пробуривает дырку по своему сечению и упирается
-        // краями в стенки (не пролезает). Но расширять по всей площади — лишние заказы; расширяем
-        // только по периметру: у крайних ячеек добавляем колонку вбок наружу.
+        // Собираем локальные позиции всех ячеек короны.
         var blocks = movedContraption.getContraption().getBlocks();
         java.util.Set<BlockPos> crownCells = new java.util.HashSet<>();
         for (Map.Entry<BlockPos, StructureBlockInfo> entry : blocks.entrySet()) {
@@ -506,33 +503,56 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             }
         }
 
+        // Тоннель надо грызть чуть ШИРЕ бура, иначе он пробуривает дырку по своему сечению и упирается
+        // краями в стенки (не пролезает). Расширяем на одну клетку наружу по всему периметру, ВКЛЮЧАЯ
+        // диагонали (углы). Раньше кольцо добавлялось только по четырём прямым сторонам (крест), и
+        // четыре УГЛА тоннеля оставались нетронутыми — угловые ячейки бура упирались в невыгрызенную
+        // диагональную стенку, и бур не пролезал (спереди копал, а по углам у основания — нет).
+        // Набор клеток, перед которыми грызём = сами ячейки короны + их боковые соседи во все 8
+        // направлений в плоскости резца; внутренние соседи (сами ячейки короны) не дублируем.
+        Direction[] lateral = lateralDirections(facing); // две перпендикулярные оси бурения (локально)
+        Direction lu = lateral[0];
+        Direction lv = lateral[1];
+        java.util.Set<BlockPos> toDig = new java.util.HashSet<>(crownCells);
+        for (BlockPos cell : crownCells) {
+            for (int a = -1; a <= 1; a++) {
+                for (int b = -1; b <= 1; b++) {
+                    if (a == 0 && b == 0) {
+                        continue;
+                    }
+                    BlockPos ring = cell.offset(
+                            a * lu.getStepX() + b * lv.getStepX(),
+                            a * lu.getStepY() + b * lv.getStepY(),
+                            a * lu.getStepZ() + b * lv.getStepZ());
+                    if (!crownCells.contains(ring)) {
+                        toDig.add(ring);
+                    }
+                }
+            }
+        }
+
         int reachCells = (int) Math.ceil(CROWN_REACH + 0.5); // на сколько клеток вперёд грызём
-        for (BlockPos cellLocal : crownCells) {
+        for (BlockPos cellLocal : toDig) {
             Vec3 cellCenter = toRealWorld(cellLocal.getCenter());
             Vec3 aheadCenter = toRealWorld(cellLocal.getCenter().add(stepLocal));
             Vec3 axis = aheadCenter.subtract(cellCenter);
             if (axis.lengthSqr() < 1.0E-6) {
                 continue;
             }
-            axis = axis.normalize();
-            // Колонка прямо перед резцом.
-            digColumn(cellCenter, axis, reachCells);
-            // Для КРАЙНИХ ячеек — ещё колонка на клетку наружу вбок, чтобы тоннель был шире бура и он
-            // пролезал. Крайняя = у которой нет соседней ячейки короны в этом боковом направлении.
-            // Боковые направления берём из контраптии (перпендикуляры оси бурения), их 4.
-            for (Direction side : Direction.values()) {
-                if (side == facing || side == facing.getOpposite()) {
-                    continue; // вдоль оси не расширяем — это вперёд/назад, а не вбок
-                }
-                BlockPos neighbor = cellLocal.relative(side);
-                if (crownCells.contains(neighbor)) {
-                    continue; // сосед по короне есть — эта ячейка не край в эту сторону
-                }
-                // Наружная клетка вбок от края + колонка вперёд от неё: расширяем стенку тоннеля.
-                Vec3 outLocal = new Vec3(side.getStepX(), side.getStepY(), side.getStepZ());
-                Vec3 outCenter = toRealWorld(cellLocal.getCenter().add(outLocal));
-                digColumn(outCenter, axis, reachCells);
-            }
+            digColumn(cellCenter, axis.normalize(), reachCells);
+        }
+    }
+
+    // Две боковые оси — направления, перпендикулярные оси бурения, в локальной системе контраптии.
+    // По ним и их диагональным комбинациям расширяем тоннель вбок.
+    private static Direction[] lateralDirections(Direction facing) {
+        switch (facing.getAxis()) {
+            case X:
+                return new Direction[]{Direction.UP, Direction.SOUTH};   // Y, Z
+            case Y:
+                return new Direction[]{Direction.EAST, Direction.SOUTH}; // X, Z
+            default:
+                return new Direction[]{Direction.EAST, Direction.UP};    // Z -> X, Y
         }
     }
 
