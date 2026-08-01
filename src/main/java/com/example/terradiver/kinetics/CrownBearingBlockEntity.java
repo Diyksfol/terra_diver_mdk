@@ -3,6 +3,7 @@ package com.example.terradiver.kinetics;
 import com.example.terradiver.physics.DrillCrownBlock;
 import com.example.terradiver.physics.PhysicsUtils;
 import com.example.terradiver.physics.DrillCrownPartBlock;
+import com.example.terradiver.physics.DrillCrownStructure;
 import com.simibubi.create.content.contraptions.bearing.MechanicalBearingBlockEntity;
 import com.simibubi.create.content.contraptions.glue.SuperGlueEntity;
 import com.simibubi.create.content.kinetics.base.IRotate.StressImpact;
@@ -90,6 +91,9 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     private int brakeDir = 1;
     private int brakeGuard = 0;
 
+    // Счётчик тиков между перезаказами грызни. Чисто серверный, синхронизировать не нужно.
+    private int miningRefreshCounter = 0;
+
     // Блок сносят: тормозить некогда, иначе BE умрёт с недоразобранной контраптией на руках.
     private boolean removing = false;
 
@@ -102,10 +106,13 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
     // 12 здесь даёт примерно то же, что 160 давало бы от оборотов вала. - TUNE
     private static final float BREAK_SPEED_DIVISOR = 12.0F; // темп грызни; выше = медленнее
 
-    // На сколько блоков вперёд от плоскости короны заглядываем. - TUNE
-    private static final double CROWN_REACH = 0.5;
-    // Запас радиуса сверх габарита короны — обеспечивает боковой охват (грызём чуть шире короны).
-    private static final double CROWN_RADIUS_MARGIN = 0.6;
+    // На сколько блоков вперёд от передней грани короны заказываем грызню. - TUNE
+    private static final double DIG_REACH = 1.0;
+    // Как часто перезаказывать грызню, в тиках. Движок Offroad копит прогресс, пока с момента
+    // последнего заказа прошло меньше 5 тиков, а сам заказ живёт 20 тиков (проверено по коду
+    // MultiMiningServerManager.BlockBreakingData.tick). Поэтому 4 — максимальный интервал, при
+    // котором темп грызни не падает вовсе, и вчетверо меньше работы на сервере. - TUNE
+    private static final int MINING_REFRESH_TICKS = 4;
     // Ниже этой скорости грызть нечем — бур фактически стоит.
     private static final float MIN_DIG_SPEED = 0.05F;
 
@@ -211,7 +218,12 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
             }
         }
         advanceProfile();
-        updateMiningBlocks();
+        // Перезаказ грызни не каждый тик: заказ у движка живёт дольше, чем тик, и до истечения
+        // прогресс копится сам. См. MINING_REFRESH_TICKS.
+        if (++miningRefreshCounter >= MINING_REFRESH_TICKS) {
+            miningRefreshCounter = 0;
+            updateMiningBlocks();
+        }
         if (braking) {
             brakeGuard--;
             if (brakeRemaining <= BRAKE_ARRIVE_EPS || brakeGuard <= 0) {
@@ -485,86 +497,100 @@ public class CrownBearingBlockEntity extends MechanicalBearingBlockEntity implem
         if (level == null || level.isClientSide || movedContraption == null || !isActive()) {
             return;
         }
+        var contraption = movedContraption.getContraption();
+        if (contraption == null) {
+            return;
+        }
         BlockState self = getBlockState();
         if (!(self.getBlock() instanceof CrownBearingBlock)) {
             return;
         }
-        // Направление бурения В МИРЕ получаем переводом двух точек контраптии, а не из facing
-        // подшипника: на физичной штуковине бур повёрнут как угодно. Локальный шаг = facing.
-        Direction facing = self.getValue(CrownBearingBlock.FACING);
-        Vec3 stepLocal = new Vec3(facing.getStepX(), facing.getStepY(), facing.getStepZ());
-
-        // Собираем локальные позиции всех ячеек короны.
-        var blocks = movedContraption.getContraption().getBlocks();
-        java.util.Set<BlockPos> crownCells = new java.util.HashSet<>();
-        for (Map.Entry<BlockPos, StructureBlockInfo> entry : blocks.entrySet()) {
-            if (isCrown(entry.getValue().state())) {
-                crownCells.add(entry.getKey());
+        Direction bearingFacing = self.getValue(CrownBearingBlock.FACING);
+        double margin = ModConfig.TUNNEL_CLEARANCE.get();
+        // Каждая корона грызёт СВОЙ цилиндр — так корректно считается и стойка из нескольких корон.
+        for (Map.Entry<BlockPos, StructureBlockInfo> entry : contraption.getBlocks().entrySet()) {
+            BlockState st = entry.getValue().state();
+            if (!(st.getBlock() instanceof DrillCrownBlock crown)) {
+                continue;
             }
+            int side = sideOf(crown.crownSize());
+            if (side <= 0) {
+                continue;
+            }
+            Direction crownFacing = st.hasProperty(DrillCrownBlock.FACING)
+                    ? st.getValue(DrillCrownBlock.FACING)
+                    : bearingFacing;
+            int layers = DrillCrownStructure.depthLayers(crown.crownSize());
+            digCylinder(entry.getKey(), crownFacing, side, layers, margin);
         }
+    }
 
-        // Тоннель надо грызть чуть ШИРЕ бура, иначе он пробуривает дырку по своему сечению и упирается
-        // краями в стенки (не пролезает). Расширяем на одну клетку наружу по всему периметру, ВКЛЮЧАЯ
-        // диагонали (углы). Раньше кольцо добавлялось только по четырём прямым сторонам (крест), и
-        // четыре УГЛА тоннеля оставались нетронутыми — угловые ячейки бура упирались в невыгрызенную
-        // диагональную стенку, и бур не пролезал (спереди копал, а по углам у основания — нет).
-        // Набор клеток, перед которыми грызём = сами ячейки короны + их боковые соседи во все 8
-        // направлений в плоскости резца; внутренние соседи (сами ячейки короны) не дублируем.
-        Direction[] lateral = lateralDirections(facing); // две перпендикулярные оси бурения (локально)
-        Direction lu = lateral[0];
-        Direction lv = lateral[1];
-        java.util.Set<BlockPos> toDig = new java.util.HashSet<>(crownCells);
-        for (BlockPos cell : crownCells) {
-            for (int a = -1; a <= 1; a++) {
-                for (int b = -1; b <= 1; b++) {
-                    if (a == 0 && b == 0) {
+    /*
+     * Заказать грызню в цилиндре перед ОДНОЙ короной.
+     *
+     * Геометрия задана непрерывно: ось (мировое направление бурения), радиус (половина стороны короны
+     * плюс запас из конфига) и отрезок вдоль оси (от плоскости мастера до передней грани плюс глубина
+     * заказа). Блок попадает в заказ, если его ЦЕНТР лежит внутри этого цилиндра.
+     *
+     * Так сделано взамен прежнего «от каждой ячейки колонка вперёд плюс кольцо соседей». Прежний
+     * способ наследовал форму самой короны: у неё два слоя разного радиуса (усечённый конус), поэтому
+     * у передней грани тоннель выходил уже, а у задней шире — разница около клетки, ровно та, что
+     * видна в тесте. Вдобавок заказ считался от ПОВЁРНУТЫХ на текущий угол ячеек с округлением их
+     * центров к сетке блоков, из-за чего зона дрожала вместе с вращением и уезжала на клетку, когда
+     * машина стоит не по сетке (на физкорабле это обычное дело). Цилиндр от оси не зависит ни от угла
+     * поворота, ни от дробной позиции корабля: запас вокруг тела одинаков со всех сторон и по всей
+     * длине.
+     *
+     * Заодно дешевле: перебирается один компактный ящик вокруг оси, а тяжёлая проверка блока делается
+     * только для позиций, реально попавших в цилиндр.
+     */
+    private void digCylinder(BlockPos masterLocal, Direction crownFacing, int side, int layers, double margin) {
+        Vec3 centre = toRealWorld(masterLocal.getCenter());
+        Vec3 aheadOne = toRealWorld(masterLocal.getCenter().add(
+                crownFacing.getStepX(), crownFacing.getStepY(), crownFacing.getStepZ()));
+        Vec3 axis = aheadOne.subtract(centre);
+        if (axis.lengthSqr() < 1.0E-6) {
+            return;
+        }
+        axis = axis.normalize();
+
+        double radius = side / 2.0 + margin;        // радиус тоннеля: тело короны плюс запас
+        double from = 0.5;                          // сразу за плоскостью мастера
+        double to = (layers - 1) + 0.5 + DIG_REACH; // передняя грань короны плюс глубина заказа
+        double radiusSq = radius * radius;
+
+        Vec3 segA = centre.add(axis.scale(from));
+        Vec3 segB = centre.add(axis.scale(to));
+        int minX = Mth.floor(Math.min(segA.x, segB.x) - radius);
+        int maxX = Mth.ceil(Math.max(segA.x, segB.x) + radius);
+        int minY = Mth.floor(Math.min(segA.y, segB.y) - radius);
+        int maxY = Mth.ceil(Math.max(segA.y, segB.y) + radius);
+        int minZ = Mth.floor(Math.min(segA.z, segB.z) - radius);
+        int maxZ = Mth.ceil(Math.max(segA.z, segB.z) + radius);
+
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    double vx = x + 0.5 - centre.x;
+                    double vy = y + 0.5 - centre.y;
+                    double vz = z + 0.5 - centre.z;
+                    double along = vx * axis.x + vy * axis.y + vz * axis.z;
+                    if (along <= from || along > to) {
                         continue;
                     }
-                    BlockPos ring = cell.offset(
-                            a * lu.getStepX() + b * lv.getStepX(),
-                            a * lu.getStepY() + b * lv.getStepY(),
-                            a * lu.getStepZ() + b * lv.getStepZ());
-                    if (!crownCells.contains(ring)) {
-                        toDig.add(ring);
+                    double radialSq = vx * vx + vy * vy + vz * vz - along * along;
+                    if (radialSq > radiusSq) {
+                        continue;
                     }
+                    cursor.set(x, y, z);
+                    BlockState state = level.getBlockState(cursor);
+                    if (state.isAir() || !PhysicsUtils.is_diggable(state)) {
+                        continue;
+                    }
+                    MultiMiningServerManager.addOrRefreshPos(level, cursor.immutable(), this);
                 }
             }
-        }
-
-        int reachCells = (int) Math.ceil(CROWN_REACH + 0.5); // на сколько клеток вперёд грызём
-        for (BlockPos cellLocal : toDig) {
-            Vec3 cellCenter = toRealWorld(cellLocal.getCenter());
-            Vec3 aheadCenter = toRealWorld(cellLocal.getCenter().add(stepLocal));
-            Vec3 axis = aheadCenter.subtract(cellCenter);
-            if (axis.lengthSqr() < 1.0E-6) {
-                continue;
-            }
-            digColumn(cellCenter, axis.normalize(), reachCells);
-        }
-    }
-
-    // Две боковые оси — направления, перпендикулярные оси бурения, в локальной системе контраптии.
-    // По ним и их диагональным комбинациям расширяем тоннель вбок.
-    private static Direction[] lateralDirections(Direction facing) {
-        switch (facing.getAxis()) {
-            case X:
-                return new Direction[]{Direction.UP, Direction.SOUTH};   // Y, Z
-            case Y:
-                return new Direction[]{Direction.EAST, Direction.SOUTH}; // X, Z
-            default:
-                return new Direction[]{Direction.EAST, Direction.UP};    // Z -> X, Y
-        }
-    }
-
-    // Заказать колонку клеток от точки start вдоль оси на reach клеток вперёд (пропуская непородные).
-    private void digColumn(Vec3 start, Vec3 axis, int reach) {
-        for (int step = 1; step <= reach; step++) {
-            BlockPos target = BlockPos.containing(start.add(axis.scale(step)));
-            BlockState state = level.getBlockState(target);
-            if (state.isAir() || !PhysicsUtils.is_diggable(state)) {
-                continue;
-            }
-            MultiMiningServerManager.addOrRefreshPos(level, target, this);
         }
     }
 

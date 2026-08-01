@@ -23,6 +23,7 @@ public class ModConfig {
     public static final ModConfigSpec.DoubleValue CROWN_MATERIAL_FACTOR_NETHERITE;
     public static final ModConfigSpec.DoubleValue MIN_HARDNESS;
     public static final ModConfigSpec.DoubleValue RATE_MAX;
+    public static final ModConfigSpec.DoubleValue TUNNEL_CLEARANCE;
 
     // ==================== MODES & MOVEMENT ====================
     public static final ModConfigSpec.DoubleValue DIVE_TRIGGER_SPEED;
@@ -99,6 +100,9 @@ public class ModConfig {
         RATE_MAX = BUILDER
                 .comment("Maximum drilling rate (blocks/tick), used as [-RATE_MAX, RATE_MAX]")
                 .defineInRange("rate_max", 1.0, 0.1, 10.0);
+        TUNNEL_CLEARANCE = BUILDER
+                .comment("Extra tunnel radius over the crown itself, in blocks. Tunnel radius = crownSide/2 + this")
+                .defineInRange("tunnel_clearance", 1.0, 0.0, 3.0);
         BUILDER.pop();
 
         // Modes & Movement
